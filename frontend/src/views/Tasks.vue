@@ -4,11 +4,11 @@
       <n-button circle @click="prevDay">
         <template #icon><n-icon><ChevronBack /></n-icon></template>
       </n-button>
-      <n-date-picker v-model:value="currentDate" type="date" value-format="yyyy-MM-dd" :input-readonly="true" style="width: 150px" @update:value="loadTasks" />
+      <n-date-picker v-model:value="currentDate" type="date" value-format="yyyy-MM-dd" :input-readonly="true" style="width: 120px" @update:value="loadTasks" />
       <n-button circle @click="nextDay">
         <template #icon><n-icon><ChevronForward /></n-icon></template>
       </n-button>
-      <n-button size="small" @click="goToday">今天</n-button>
+      <n-button size="small" @click="goToday" class="right-align">今天</n-button>
       <n-button type="primary" size="small" @click="showCreateDialog">
         <template #icon><n-icon><Add /></n-icon></template>
         新建任务
@@ -298,9 +298,12 @@ onMounted(() => {
   margin-bottom: 16px;
   flex-wrap: wrap;
 }
+.date-nav .right-align {
+  margin-left: auto;
+}
 .date-nav :deep(.n-date-picker) {
-  flex: 1;
-  min-width: 140px;
+  flex: none;
+  min-width: 100px;
 }
 .task-item {
   display: flex;
