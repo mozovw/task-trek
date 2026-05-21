@@ -67,13 +67,18 @@ export class StatsService {
   }
 
   async getUnfinished(userId: number) {
+    const today = new Date().toISOString().split('T')[0];
+
     const allTasks = await this.taskRepository.find({
       where: { userId, status: 'pending' },
       order: { plannedDate: 'ASC' },
     });
 
     const leafTasks = allTasks.filter(
-      (t) => !allTasks.some((other) => other.parentId === t.id) && t.estimatedMinutes > 0,
+      (t) =>
+        !allTasks.some((other) => other.parentId === t.id) &&
+        t.estimatedMinutes > 0 &&
+        t.plannedDate < today,
     );
 
     return leafTasks.map((t) => ({

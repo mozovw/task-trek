@@ -171,7 +171,7 @@ export class TaskService {
     await this.cascadeCancelCheckin(userId, id);
 
     // 级联向上取消父任务打卡
-    // cascadeUpCancelCheckin disabled: no upward cancel
+    await this.cascadeUpCancelCheckin(userId, task.parentId);
 
     return task;
   }
@@ -236,11 +236,28 @@ export class TaskService {
     const parent = await this.taskRepository.findOne({ where: { id: parentId, userId } });
     if (!parent) return;
 
-    if (parent.status === 'done') {
+    const children = await this.taskRepository.find({ where: { parentId, userId } });
+    const allDone = children.every(c => c.status === 'done');
+
+    if (allDone && parent.status !== 'done') {
+      // 所有子任务完成，父任务设为完成
+      parent.status = 'done';
+      parent.completedAt = new Date();
+      await this.taskRepository.save(parent);
+
+      const checkin = new Checkin();
+      checkin.taskId = parent.id;
+      checkin.completedAt = new Date();
+      await this.checkinRepository.save(checkin);
+
+      await this.cascadeUpCancelCheckin(userId, parent.parentId);
+    } else if (!allDone && parent.status === 'done') {
+      // 有子任务未完成，父任务取消完成
       parent.status = 'pending';
       parent.completedAt = null;
       await this.taskRepository.save(parent);
       await this.checkinRepository.delete({ taskId: parent.id });
+
       await this.cascadeUpCancelCheckin(userId, parent.parentId);
     }
   }

@@ -40,17 +40,7 @@
       <div ref="trendChartRef" style="height: 300px"></div>
     </n-card>
 
-    <n-card style="margin-top: 20px">
-      <template #header>
-        <span>未完成任务</span>
-      </template>
-      <n-data-table
-        :columns="unfinishedColumns"
-        :data="unfinished"
-        :pagination="false"
-        size="small"
-      />
-    </n-card>
+
   </div>
 </template>
 
