@@ -1,5 +1,6 @@
 <template>
   <div class="tasks-page">
+    <n-card >
     <div class="date-nav">
       <n-button circle @click="prevDay">
         <template #icon><n-icon><ChevronBack /></n-icon></template>
@@ -17,8 +18,8 @@
         </n-button>
       </div>
     </div>
-
-    <n-card>
+</n-card>
+    <n-card  style="margin-top: 20px; min-height: 550px">
       <n-empty v-if="tasks.length === 0" description="暂无任务" />
       <div v-for="task in tasks" :key="task.id" class="task-item" :style="{ paddingLeft: (task.level - 1) * 24 + 'px' }">
         <div class="task-content">
@@ -350,7 +351,6 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 16px;
   flex-wrap: wrap;
 }
 .date-nav .right-align {

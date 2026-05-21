@@ -3,13 +3,15 @@
     <n-layout-sider
       bordered
       :width="200"
-      :collapsed-width="64"
+      :collapsed-width="0"
       :collapsed="collapsed"
-      show-trigger
-      collapse-mode="width"
+      :collapse-mode="isMobile ? 'overlay' : 'width'"
       @update:collapsed="onCollapse"
     >
-      <div class="logo">{{ collapsed ? 'TT' : 'Task Trek' }}</div>
+      <div class="sider-header" @click="collapsed = !collapsed" style="cursor: pointer;">
+        <span v-if="!collapsed" class="logo-text">Task Trek</span>
+        <span v-else class="logo-text">TT</span>
+      </div>
       <n-menu
         :value="activeMenu"
         :options="menuOptions"
@@ -18,7 +20,7 @@
     </n-layout-sider>
     <n-layout>
       <n-layout-header bordered class="header">
-        <n-button quaternary circle class="menu-toggle" @click="collapsed = !collapsed">
+        <n-button quaternary circle @click="collapsed = !collapsed">
           <template #icon><n-icon><MenuOutline /></n-icon></template>
         </n-button>
         <div class="header-right">
@@ -33,6 +35,7 @@
         </div>
       </n-layout-header>
       <n-layout-content class="content">
+        <div v-if="isMobile && !collapsed" class="sidebar-overlay" @click="collapsed = true"></div>
         <router-view />
       </n-layout-content>
     </n-layout>
@@ -61,13 +64,22 @@ const route = useRoute()
 const message = useMessage()
 const userStore = useUserStore()
 
-const collapsed = ref(false)
+const isMobile = ref(window.innerWidth <= 768)
+const collapsed = ref(isMobile.value)
 
 const activeMenu = computed(() => route.path)
 
 const onCollapse = (value: boolean) => {
   collapsed.value = value
 }
+
+// 监听窗口大小变化
+window.addEventListener('resize', () => {
+  isMobile.value = window.innerWidth <= 768
+  if (!isMobile.value) {
+    collapsed.value = false
+  }
+})
 
 const renderIcon = (icon: any) => () => h(NIcon, null, { default: () => h(icon) })
 
@@ -107,15 +119,19 @@ const handleUserAction = async (key: string) => {
 .layout {
   height: 100vh;
 }
-.logo {
+.sider-header {
   height: 64px;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   font-size: 20px;
   font-weight: bold;
   color: #2080f0;
   border-bottom: 1px solid #f0f0f0;
+}
+.logo-text {
+  white-space: nowrap;
 }
 .header {
   height: 64px;
@@ -130,20 +146,31 @@ const handleUserAction = async (key: string) => {
   gap: 16px;
   margin-left: auto;
 }
-.menu-toggle {
-  display: none;
-}
 .user-name {
   margin-right: 4px;
 }
 .content {
   padding: 20px;
   background: #f5f7fa;
+  position: relative;
+}
+.sidebar-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 10;
 }
 
 @media (max-width: 768px) {
-  .menu-toggle {
-    display: inline-flex;
+  .n-layout-sider {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    z-index: 1000;
   }
   .user-name {
     display: none;

@@ -1,5 +1,6 @@
 <template>
   <div class="progress-page">
+        <n-card  >
     <n-grid :cols="4" :x-gap="16">
       <n-gi>
         <n-statistic label="总任务数" :value="overview.total" />
@@ -21,10 +22,7 @@
         </n-statistic>
       </n-gi>
     </n-grid>
-
-    <n-card style="margin-top: 20px">
-      <div ref="completionChartRef" style="height: 200px; display: flex; justify-content: center"></div>
-    </n-card>
+  </n-card>
 
     <n-card style="margin-top: 20px">
       <template #header>
@@ -37,7 +35,7 @@
           </n-radio-group>
         </div>
       </template>
-      <div ref="trendChartRef" style="height: 300px"></div>
+      <div ref="trendChartRef" style="height: 400px"></div>
     </n-card>
 
 
@@ -62,13 +60,11 @@ const trendDays = ref(7)
 const trendData = ref<any[]>([])
 const unfinished = ref<UnfinishedTask[]>([])
 const trendChartRef = ref<HTMLElement>()
-const completionChartRef = ref<HTMLElement>()
 
 const loadOverview = async () => {
   try {
     const { data } = await statsApi.getOverview()
     overview.value = data
-    renderCompletionChart()
   } catch {
     // handled
   }
@@ -98,7 +94,7 @@ const renderTrendChart = () => {
   const chart = echarts.init(trendChartRef.value)
   chart.setOption({
     tooltip: { trigger: 'axis' },
-    legend: { data: ['完成任务数', '耗时(分钟)'] },
+    legend: { data: ['完成任务数', '耗时 (分钟)'] },
     grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
     xAxis: {
       type: 'category',
@@ -106,12 +102,12 @@ const renderTrendChart = () => {
       axisLabel: { rotate: 45 },
     },
     yAxis: [
-      { type: 'value', name: '耗时(分钟)', position: 'left' },
+      { type: 'value', name: '耗时 (分钟)', position: 'left' },
       { type: 'value', name: '任务数', position: 'right' },
     ],
     series: [
       {
-        name: '耗时(分钟)',
+        name: '耗时 (分钟)',
         type: 'line',
         data: trendData.value.map((d) => d.minutes),
         smooth: true,
@@ -122,33 +118,6 @@ const renderTrendChart = () => {
         yAxisIndex: 1,
         data: trendData.value.map((d) => d.count),
         smooth: true,
-      },
-    ],
-  })
-  window.addEventListener('resize', () => chart.resize())
-}
-
-const renderCompletionChart = () => {
-  if (!completionChartRef.value) return
-  const chart = echarts.init(completionChartRef.value)
-  chart.setOption({
-    series: [
-      {
-        type: 'pie',
-        radius: ['50%', '70%'],
-        avoidLabelOverlap: false,
-        label: {
-          show: true,
-          position: 'center',
-          formatter: '{d}%',
-          fontSize: 24,
-          fontWeight: 'bold',
-        },
-        labelLine: { show: false },
-        data: [
-          { value: overview.value.completed, name: '已完成', itemStyle: { color: '#18a058' } },
-          { value: overview.value.total - overview.value.completed, name: '未完成', itemStyle: { color: '#e0e0e0' } },
-        ],
       },
     ],
   })
