@@ -8,11 +8,14 @@
       <n-button circle @click="nextDay">
         <template #icon><n-icon><ChevronForward /></n-icon></template>
       </n-button>
-      <n-button size="small" @click="goToday" class="right-align">今天</n-button>
-      <n-button type="primary" size="small" @click="showCreateDialog">
-        <template #icon><n-icon><Add /></n-icon></template>
-        新建任务
-      </n-button>
+      <div class="right-actions">
+        <n-button size="small" @click="showUnfinished">未完成任务</n-button>
+        <n-button size="small" @click="goToday">今天</n-button>
+        <n-button type="primary" size="small" @click="showCreateDialog">
+          <template #icon><n-icon><Add /></n-icon></template>
+          新建任务
+        </n-button>
+      </div>
     </div>
 
     <n-card>
@@ -73,17 +76,27 @@
         </n-space>
       </template>
     </n-modal>
+
+    <!-- 未完成任务弹窗 -->
+    <n-modal v-model:show="showUnfinishedModal" preset="dialog" title="未完成任务">
+      <n-data-table
+        :columns="unfinishedColumns"
+        :data="unfinishedTasks"
+        :pagination="false"
+        size="small"
+      />
+    </n-modal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, h } from 'vue'
 import { useRoute } from 'vue-router'
-import { useMessage, useDialog } from 'naive-ui'
-import { NIcon } from 'naive-ui'
+import { useMessage, useDialog, type DataTableColumns } from 'naive-ui'
+import { NIcon, NButton } from 'naive-ui'
 import { ChevronBack, ChevronForward, Add, AddCircle, Create, Trash } from '@vicons/ionicons5'
-import { taskApi } from '@/api/modules'
-import type { Task } from '@/types'
+import { taskApi, statsApi } from '@/api/modules'
+import type { Task, UnfinishedTask } from '@/types'
 
 const message = useMessage()
 const dialog = useDialog()
@@ -96,6 +109,9 @@ const dialogVisible = ref(false)
 const isEdit = ref(false)
 const editingId = ref<number | null>(null)
 const allTasks = ref<Task[]>([])
+
+const showUnfinishedModal = ref(false)
+const unfinishedTasks = ref<UnfinishedTask[]>([])
 
 const taskForm = reactive({
   name: '',
@@ -173,6 +189,45 @@ const goToday = () => {
   currentDate.value = new Date().toISOString().split('T')[0]
   loadTasks()
 }
+
+const showUnfinished = async () => {
+  showUnfinishedModal.value = true
+  await loadUnfinished()
+}
+
+const loadUnfinished = async () => {
+  try {
+    const { data } = await statsApi.getUnfinished()
+    unfinishedTasks.value = data
+  } catch (e) {
+    message.error('加载未完成任务失败')
+  }
+}
+
+const unfinishedColumns: DataTableColumns<UnfinishedTask> = [
+  { title: '任务名称', key: 'name' },
+  { title: '计划日期', key: 'plannedDate', width: 120 },
+  { title: '耗时(分钟)', key: 'estimatedMinutes', width: 100 },
+  {
+    title: '操作',
+    key: 'actions',
+    width: 100,
+    render: (row: UnfinishedTask) =>
+      h(
+        NButton,
+        {
+          size: 'small',
+          type: 'primary',
+          onClick: async () => {
+            await taskApi.checkinTask(row.id)
+            message.success('打卡成功')
+            loadUnfinished()
+          },
+        },
+        '打卡'
+      ),
+  },
+]
 
 const showCreateDialog = () => {
   isEdit.value = false
@@ -299,6 +354,11 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 .date-nav .right-align {
+  margin-left: auto;
+}
+.right-actions {
+  display: flex;
+  gap: 8px;
   margin-left: auto;
 }
 .date-nav :deep(.n-date-picker) {
