@@ -43,6 +43,16 @@ export const taskApi = {
 
   cancelCheckin: (id: number) =>
     api.post(`/tasks/${id}/cancel-checkin`),
+
+  // 倒计时相关 API
+  startTimer: (id: number) =>
+    api.post<Task>(`/tasks/${id}/timer/start`),
+
+  pauseTimer: (id: number) =>
+    api.post<Task>(`/tasks/${id}/timer/pause`),
+
+  syncTimer: (id: number) =>
+    api.post<Task>(`/tasks/${id}/timer/sync`),
 }
 
 export const statsApi = {

@@ -21,20 +21,32 @@
 </n-card>
     <n-card  style="margin-top: 20px; min-height: 550px">
       <n-empty v-if="tasks.length === 0" description="暂无任务" />
-      <div v-for="task in tasks" :key="task.id" class="task-item" :style="{ paddingLeft: (task.level - 1) * 24 + 'px' }">
+      <div v-for="task in tasks" :key="task.id" class="task-item" :style="{ paddingLeft: (task.level - 1) * 24 + 'px' }" :class="{ 'timer-running': task.timerRunning }">
         <div class="task-content">
           <n-checkbox
             :checked="task.status === 'done'"
             @update:checked="() => toggleCheckin(task)"
           />
           <div class="task-info">
-            <span :class="{ 'task-done': task.status === 'done' }" class="task-name">{{ task.name }}</span>
+            <span :class="{ 'task-done': task.status === 'done', 'counting-down': task.timerRunning }" class="task-name">{{ task.name }}</span>
             <span v-if="task.description" class="task-desc">{{ task.description }}</span>
           </div>
-          <n-tag v-if="task.estimatedMinutes > 0" size="small" type="info">{{ task.estimatedMinutes }}分钟</n-tag>
+          <n-tag v-if="task.estimatedMinutes > 0 && !task.timerRunning" size="small" type="info">{{ task.estimatedMinutes }}分钟</n-tag>
+          <span v-if="task.timerRunning" class="timer-display">⏱ {{ formatTimer(task.remainingSeconds) }}</span>
         </div>
         <div class="task-actions">
-          <n-button v-if="task.level < 3" size="tiny" quaternary circle @click="showAddChildDialog(task)">
+          <!-- 倒计时按钮 - 仅叶子节点且有预计耗时且未完成时显示 -->
+          <n-button v-if="!task.children?.length && !task.timerRunning && task.estimatedMinutes > 0 && task.status !== 'done'" size="tiny" circle @click="toggleTimer(task)">
+            <template #icon>
+              <n-icon><component :is="PlayCircleOutline" /></n-icon>
+            </template>
+          </n-button>
+          <n-button v-if="task.timerRunning" size="tiny" quaternary circle type="warning" @click="toggleTimer(task)">
+            <template #icon>
+              <n-icon><PauseCircleOutline /></n-icon>
+            </template>
+          </n-button>
+          <n-button v-if="task.level < 3 && !task.timerRunning && !task.children?.length" size="tiny" quaternary circle @click="showAddChildDialog(task)">
             <template #icon><n-icon><AddCircle /></n-icon></template>
           </n-button>
           <n-button size="tiny" quaternary circle @click="showEditDialog(task)">
@@ -91,11 +103,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed, h } from 'vue'
+import { ref, reactive, onMounted, computed, h, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useMessage, useDialog, type DataTableColumns } from 'naive-ui'
 import { NIcon, NButton } from 'naive-ui'
-import { ChevronBack, ChevronForward, Add, AddCircle, Create, Trash } from '@vicons/ionicons5'
+import { ChevronBack, ChevronForward, Add, AddCircle, Create, Trash, PlayCircleOutline, PauseCircleOutline } from '@vicons/ionicons5'
 import { taskApi, statsApi } from '@/api/modules'
 import type { Task, UnfinishedTask } from '@/types'
 
@@ -110,6 +122,8 @@ const dialogVisible = ref(false)
 const isEdit = ref(false)
 const editingId = ref<number | null>(null)
 const allTasks = ref<Task[]>([])
+
+const timerIntervals = new Map<number, number>() // taskId -> intervalId
 
 const showUnfinishedModal = ref(false)
 const unfinishedTasks = ref<UnfinishedTask[]>([])
@@ -145,6 +159,64 @@ const parentName = computed(() => {
   if (!taskForm.parentId) return ''
   const parent = allTasks.value.find((t) => t.id === taskForm.parentId)
   return parent ? parent.name : ''
+})
+
+// 格式化计时器显示（秒 -> MM:SS）
+const formatTimer = (seconds: number): string => {
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+}
+
+// 切换计时器（开始/暂停）
+const toggleTimer = async (task: Task) => {
+  try {
+    if (task.timerRunning) {
+      // 暂停计时器
+      await taskApi.pauseTimer(task.id)
+      stopTimerInterval(task.id)
+      message.success('已暂停')
+    } else {
+      // 开始计时器
+      await taskApi.startTimer(task.id)
+      startTimerInterval(task.id)
+      message.success('已开始计时')
+    }
+    loadTasks()
+  } catch (e: any) {
+    message.error(e.message || '操作失败')
+  }
+}
+
+// 启动本地倒计时循环（每 5 秒同步一次）
+const startTimerInterval = (taskId: number) => {
+  const interval = window.setInterval(async () => {
+    try {
+      await taskApi.syncTimer(taskId)
+      // 重新加载任务列表以更新本地状态
+      await loadTasks()
+    } catch {
+      // ignore sync errors
+    }
+  }, 5000)
+  timerIntervals.set(taskId, interval)
+}
+
+// 停止计时器循环
+const stopTimerInterval = (taskId: number) => {
+  const interval = timerIntervals.get(taskId)
+  if (interval) {
+    window.clearInterval(interval)
+    timerIntervals.delete(taskId)
+  }
+}
+
+// 清理所有计时器循环
+onUnmounted(() => {
+  timerIntervals.forEach((interval) => {
+    window.clearInterval(interval)
+  })
+  timerIntervals.clear()
 })
 
 const loadTasks = async () => {
@@ -416,6 +488,19 @@ onMounted(() => {
 }
 .task-item:hover .task-actions {
   opacity: 1;
+}
+.timer-running {
+  background: linear-gradient(90deg, #fff7e6 0%, #e6f7ff 100%);
+}
+.counting-down {
+  color: #1890ff;
+  font-weight: bold;
+}
+.timer-display {
+  font-size: 13px;
+  color: #1890ff;
+  font-weight: bold;
+  white-space: nowrap;
 }
 .dialog-form {
   padding: 0 16px;

@@ -50,6 +50,16 @@ export class Task {
   @CreateDateColumn()
   createdAt: Date;
 
+  // 倒计时相关字段
+  @Column({ default: 0, type: 'integer', name: 'remaining_seconds' })
+  remainingSeconds: number;
+
+  @Column({ default: false, type: 'boolean', name: 'timer_running' })
+  timerRunning: boolean;
+
+  @Column({ nullable: true, type: 'datetime', name: 'timer_started_at' })
+  timerStartedAt: Date | null;
+
   @OneToMany(() => Task, (task) => task.parent)
   children: Task[];
 

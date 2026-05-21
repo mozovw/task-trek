@@ -43,4 +43,19 @@ export class TaskController {
   async cancelCheckin(@Req() req: any, @Param('id') id: number) {
     return this.taskService.cancelCheckin(req.user.userId, id);
   }
+
+  @Post(':id/timer/start')
+  async startTimer(@Req() req: any, @Param('id') id: number) {
+    return this.taskService.startTimer(req.user.userId, id);
+  }
+
+  @Post(':id/timer/pause')
+  async pauseTimer(@Req() req: any, @Param('id') id: number) {
+    return this.taskService.pauseTimer(req.user.userId, id);
+  }
+
+  @Post(':id/timer/sync')
+  async syncTimer(@Req() req: any, @Param('id') id: number) {
+    return this.taskService.syncTimer(req.user.userId, id);
+  }
 }

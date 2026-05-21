@@ -132,7 +132,7 @@ const handleUserAction = async (key: string) => {
 }
 .logo-text {
   white-space: nowrap;
-  padding-right: 25px;
+  padding-right: 20px;
 }
 
 .header {

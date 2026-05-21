@@ -176,6 +176,91 @@ export class TaskService {
     return task;
   }
 
+  // 倒计时相关方法
+  async startTimer(userId: number, id: number): Promise<Task> {
+    const task = await this.taskRepository.findOne({ where: { id, userId } });
+    if (!task) {
+      throw new NotFoundException('任务不存在');
+    }
+    if (task.estimatedMinutes <= 0) {
+      throw new BadRequestException('该任务没有设置预计耗时');
+    }
+    if (task.status === 'done') {
+      throw new BadRequestException('任务已完成');
+    }
+
+    // 如果是首次启动，设置剩余时间为预计耗时（秒）
+    if (task.remainingSeconds === 0) {
+      task.remainingSeconds = task.estimatedMinutes * 60;
+    }
+
+    task.timerRunning = true;
+    task.timerStartedAt = new Date();
+    return this.taskRepository.save(task);
+  }
+
+  async pauseTimer(userId: number, id: number): Promise<Task> {
+    const task = await this.taskRepository.findOne({ where: { id, userId } });
+    if (!task) {
+      throw new NotFoundException('任务不存在');
+    }
+    if (!task.timerRunning) {
+      throw new BadRequestException('任务计时器未运行');
+    }
+
+    // 计算已经过去的秒数
+    if (task.timerStartedAt) {
+      const elapsed = Math.floor((new Date().getTime() - task.timerStartedAt.getTime()) / 1000);
+      task.remainingSeconds = Math.max(0, task.remainingSeconds - elapsed);
+    }
+
+    task.timerRunning = false;
+    task.timerStartedAt = null;
+    return this.taskRepository.save(task);
+  }
+
+  async syncTimer(userId: number, id: number): Promise<Task> {
+    const task = await this.taskRepository.findOne({ where: { id, userId } });
+    if (!task) {
+      throw new NotFoundException('任务不存在');
+    }
+    if (!task.timerRunning) {
+      throw new BadRequestException('任务计时器未运行');
+    }
+
+    // 计算已经过去的秒数并更新剩余时间
+    if (task.timerStartedAt) {
+      const elapsed = Math.floor((new Date().getTime() - task.timerStartedAt.getTime()) / 1000);
+      task.remainingSeconds = Math.max(0, task.remainingSeconds - elapsed);
+      
+      // 如果时间到了，自动完成任务
+      if (task.remainingSeconds <= 0) {
+        task.timerRunning = false;
+        task.timerStartedAt = null;
+        task.status = 'done';
+        task.completedAt = new Date();
+        await this.taskRepository.save(task);
+        
+        // 记录打卡
+        const checkin = new Checkin();
+        checkin.taskId = id;
+        checkin.completedAt = new Date();
+        await this.checkinRepository.save(checkin);
+        
+        // 级联打卡
+        await this.cascadeCheckin(userId, id, new Date());
+        await this.cascadeUpCheckin(userId, task.parentId);
+        
+        return task;
+      }
+      
+      task.timerStartedAt = new Date(); // 重置启动时间，用于下次计算
+      return this.taskRepository.save(task);
+    }
+
+    return task;
+  }
+
   private async cascadeCheckin(userId: number, parentId: number, completedAt: Date): Promise<void> {
     const children = await this.taskRepository.find({ where: { parentId, userId } });
     for (const child of children) {
