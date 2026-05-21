@@ -53,10 +53,10 @@
         <n-form-item label="任务名称">
           <n-input v-model:value="taskForm.name" placeholder="请输入任务名称" />
         </n-form-item>
-        <n-form-item v-if="isEdit && taskForm.parentId" label="父任务">
+        <n-form-item v-if="isEdit && taskForm.parentId && taskForm.level > 1" label="父任务">
           <n-input :value="parentName" disabled />
         </n-form-item>
-        <n-form-item v-if="isEdit && !taskForm.parentId" label="父任务">
+        <n-form-item v-if="isEdit && !taskForm.parentId && taskForm.level > 1" label="父任务">
           <n-select v-model:value="taskForm.parentId" :options="parentSelectOptions" placeholder="选择父任务" />
         </n-form-item>
         <n-form-item label="计划日期">
@@ -125,8 +125,8 @@ const taskForm = reactive({
 
 const parentOptions = computed(() => {
   if (taskForm.level === 1) {
-    // 一级任务可以选择父任务变成二级或三级
-    return allTasks.value.filter((t) => t.level === 1 || t.level === 2)
+    // 一级任务可以选择其他一级任务作为父任务（降级为二级）
+    return allTasks.value.filter((t) => t.level === 1 && t.id !== editingId.value)
   }
   if (taskForm.level === 2) {
     return allTasks.value.filter((t) => t.level === 1)
