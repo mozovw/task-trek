@@ -1,6 +1,6 @@
 <template>
   <div class="calendar-page">
-    <n-card>
+    <n-card  style="margin-top: 20px" >
       <template #header>
         <div class="calendar-header">
           <n-button circle @click="prevMonth">

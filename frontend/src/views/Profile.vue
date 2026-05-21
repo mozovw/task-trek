@@ -1,6 +1,6 @@
 <template>
   <div class="profile-page">
-    <n-card title="个人信息">
+    <n-card title="个人信息"  style="margin-top: 20px" >
       <n-form label-placement="left" label-width="100">
         <n-form-item label="用户名">
           <span>{{ userStore.user?.username }}</span>

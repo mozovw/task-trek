@@ -2,7 +2,7 @@
   <n-layout has-sider class="layout">
     <n-layout-sider
       bordered
-      :width="200"
+      :width="180"
       :collapsed-width="0"
       :collapsed="collapsed"
       :collapse-mode="isMobile ? 'overlay' : 'width'"
@@ -132,7 +132,9 @@ const handleUserAction = async (key: string) => {
 }
 .logo-text {
   white-space: nowrap;
+  padding-right: 25px;
 }
+
 .header {
   height: 64px;
   display: flex;
@@ -150,9 +152,12 @@ const handleUserAction = async (key: string) => {
   margin-right: 4px;
 }
 .content {
-  padding: 20px;
+  padding: 0;
   background: #f5f7fa;
   position: relative;
+}
+:deep(.n-layout-scroll-container) {
+  background: #f5f7fa !important;
 }
 .sidebar-overlay {
   position: absolute;

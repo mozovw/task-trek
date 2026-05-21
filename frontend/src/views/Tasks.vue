@@ -1,6 +1,6 @@
 <template>
   <div class="tasks-page">
-    <n-card >
+    <n-card  style="margin-top: 20px" >
     <div class="date-nav">
       <n-button circle @click="prevDay">
         <template #icon><n-icon><ChevronBack /></n-icon></template>

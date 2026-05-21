@@ -1,6 +1,6 @@
 <template>
   <div class="progress-page">
-        <n-card  >
+        <n-card   style="margin-top: 20px" >
     <n-grid :cols="4" :x-gap="16">
       <n-gi>
         <n-statistic label="总任务数" :value="overview.total" />
