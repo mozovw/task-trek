@@ -32,16 +32,16 @@
             <span v-if="task.description" class="task-desc">{{ task.description }}</span>
           </div>
           <n-tag v-if="task.estimatedMinutes > 0 && !task.timerRunning" size="small" type="info">{{ task.estimatedMinutes }}分钟</n-tag>
-          <span v-if="task.timerRunning" class="timer-display">⏱ {{ formatTimer(task.remainingSeconds) }}</span>
+          <span v-if="task.timerRunning" class="timer-display">⏱ {{ formatTimer(localRemainingSeconds[task.id] ?? task.remainingSeconds) }}</span>
         </div>
         <div class="task-actions">
           <!-- 倒计时按钮 - 仅叶子节点且有预计耗时且未完成时显示 -->
-          <n-button v-if="!task.children?.length && !task.timerRunning && task.estimatedMinutes > 0 && task.status !== 'done'" size="tiny" circle @click="toggleTimer(task)">
+          <n-button v-if="!task.children?.length && !task.timerRunning && task.estimatedMinutes > 0 && task.status !== 'done'" size="tiny" circle class="timer-btn start" @click="toggleTimer(task)">
             <template #icon>
               <n-icon><component :is="PlayCircleOutline" /></n-icon>
             </template>
           </n-button>
-          <n-button v-if="task.timerRunning" size="tiny" quaternary circle type="warning" @click="toggleTimer(task)">
+          <n-button v-if="task.timerRunning" size="tiny" quaternary circle type="warning" class="timer-btn pause" @click="toggleTimer(task)">
             <template #icon>
               <n-icon><PauseCircleOutline /></n-icon>
             </template>
@@ -123,10 +123,14 @@ const isEdit = ref(false)
 const editingId = ref<number | null>(null)
 const allTasks = ref<Task[]>([])
 
-const timerIntervals = new Map<number, number>() // taskId -> intervalId
+const timerIntervals = new Map<number, number>() // taskId -> intervalId (5s sync)
+const localTimerIntervals = new Map<number, number>() // taskId -> intervalId (1s local countdown)
 
 const showUnfinishedModal = ref(false)
 const unfinishedTasks = ref<UnfinishedTask[]>([])
+
+// 本地倒计时状态（用于每秒更新显示）
+const localRemainingSeconds = ref<Record<number, number>>({})
 
 const taskForm = reactive({
   name: '',
@@ -174,11 +178,17 @@ const toggleTimer = async (task: Task) => {
     if (task.timerRunning) {
       // 暂停计时器
       await taskApi.pauseTimer(task.id)
-      stopTimerInterval(task.id)
+      stopAllIntervals(task.id)
+      delete localRemainingSeconds.value[task.id]
       message.success('已暂停')
     } else {
       // 开始计时器
-      await taskApi.startTimer(task.id)
+      const updatedTask = await taskApi.startTimer(task.id)
+      // 初始化本地剩余时间
+      localRemainingSeconds.value[task.id] = updatedTask.data.remainingSeconds
+      // 启动本地每秒倒计时
+      startLocalCountdown(task.id, updatedTask.data.remainingSeconds)
+      // 启动数据库同步循环（5 秒一次）
       startTimerInterval(task.id)
       message.success('已开始计时')
     }
@@ -188,13 +198,49 @@ const toggleTimer = async (task: Task) => {
   }
 }
 
-// 启动本地倒计时循环（每 5 秒同步一次）
+// 启动本地每秒倒计时（仅更新显示，不同步 DB）
+const startLocalCountdown = (taskId: number, initialSeconds: number) => {
+  let seconds = initialSeconds
+  
+  // 如果有之前的定时器，先清除
+  stopLocalCountdown(taskId)
+  
+  const interval = window.setInterval(() => {
+    seconds--
+    localRemainingSeconds.value[taskId] = seconds
+    
+    // 如果倒计时结束，停止并重新加载
+    if (seconds <= 0) {
+      stopLocalCountdown(taskId)
+      loadTasks()
+    }
+  }, 1000)
+  
+  localTimerIntervals.set(taskId, interval)
+}
+
+// 停止本地倒计时
+const stopLocalCountdown = (taskId: number) => {
+  const interval = localTimerIntervals.get(taskId)
+  if (interval) {
+    window.clearInterval(interval)
+    localTimerIntervals.delete(taskId)
+  }
+}
+
+// 启动本地倒计时循环（每 5 秒同步一次到数据库）
 const startTimerInterval = (taskId: number) => {
   const interval = window.setInterval(async () => {
     try {
       await taskApi.syncTimer(taskId)
       // 重新加载任务列表以更新本地状态
       await loadTasks()
+      // 同步后重置本地倒计时
+      const task = tasks.value.find(t => t.id === taskId)
+      if (task && task.timerRunning && task.remainingSeconds > 0) {
+        localRemainingSeconds.value[taskId] = task.remainingSeconds
+        startLocalCountdown(taskId, task.remainingSeconds)
+      }
     } catch {
       // ignore sync errors
     }
@@ -211,12 +257,22 @@ const stopTimerInterval = (taskId: number) => {
   }
 }
 
+// 停止所有定时器（本地 + 同步）
+const stopAllIntervals = (taskId: number) => {
+  stopTimerInterval(taskId)
+  stopLocalCountdown(taskId)
+}
+
 // 清理所有计时器循环
 onUnmounted(() => {
   timerIntervals.forEach((interval) => {
     window.clearInterval(interval)
   })
+  localTimerIntervals.forEach((interval) => {
+    window.clearInterval(interval)
+  })
   timerIntervals.clear()
+  localTimerIntervals.clear()
 })
 
 const loadTasks = async () => {
@@ -453,6 +509,7 @@ onMounted(() => {
   gap: 12px;
   flex: 1;
   min-width: 0;
+  position: relative;
 }
 .task-info {
   flex: 1;
@@ -501,6 +558,19 @@ onMounted(() => {
   color: #1890ff;
   font-weight: bold;
   white-space: nowrap;
+  margin-left: 8px;
+  padding: 2px 8px;
+  background: #e6f7ff;
+  border-radius: 4px;
+  display: inline-block;
+  position: absolute;
+  right: 120px;
+  z-index: 10;
+}
+.timer-btn.start,
+.timer-btn.pause {
+  position: relative;
+  z-index: 20;
 }
 .dialog-form {
   padding: 0 16px;
