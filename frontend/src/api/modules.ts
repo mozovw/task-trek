@@ -1,0 +1,74 @@
+import api from './index'
+import type { AuthResponse, User, Task, StatsOverview, TrendData, UnfinishedTask, CalendarData, ImportResult } from '@/types'
+
+export const authApi = {
+  login: (username: string, password: string) =>
+    api.post<AuthResponse>('/auth/login', { username, password }),
+
+  register: (username: string, password: string, name?: string) =>
+    api.post<AuthResponse>('/auth/register', { username, password, name }),
+
+  logout: () =>
+    api.post('/auth/logout'),
+
+  changePassword: (oldPassword: string, newPassword: string, newPasswordConfirm: string) =>
+    api.put('/auth/password', { oldPassword, newPassword, newPasswordConfirm }),
+}
+
+export const userApi = {
+  getUserInfo: () =>
+    api.get<User>('/user'),
+
+  updateName: (name: string) =>
+    api.put<User>('/user/name', { name }),
+}
+
+export const taskApi = {
+  getTasks: (date?: string) => {
+    const config = date ? { params: { date } } : {}
+    return api.get<Task[]>('/tasks', config)
+  },
+
+  createTask: (data: Partial<Task>) =>
+    api.post<Task>('/tasks', data),
+
+  updateTask: (id: number, data: Partial<Task>) =>
+    api.put<Task>(`/tasks/${id}`, data),
+
+  deleteTask: (id: number) =>
+    api.delete(`/tasks/${id}`),
+
+  checkinTask: (id: number) =>
+    api.post(`/tasks/${id}/checkin`),
+
+  cancelCheckin: (id: number) =>
+    api.post(`/tasks/${id}/cancel-checkin`),
+}
+
+export const statsApi = {
+  getOverview: () =>
+    api.get<StatsOverview>('/stats/overview'),
+
+  getTrend: (days: number) =>
+    api.get<TrendData[]>('/stats/trend', { params: { days } }),
+
+  getUnfinished: () =>
+    api.get<UnfinishedTask[]>('/stats/unfinished'),
+
+  getCalendar: (year: number, month: number) =>
+    api.get<CalendarData>('/stats/calendar', { params: { year, month } }),
+}
+
+export const exportApi = {
+  exportMarkdown: () =>
+    api.get('/export/markdown', { responseType: 'blob' }),
+
+  getTemplate: () =>
+    api.get('/export/template', { responseType: 'blob' }),
+
+  importMarkdown: (content: string) =>
+    api.post<ImportResult>('/export/import', { content }),
+
+  clearAllTasks: () =>
+    api.post('/export/clear'),
+}

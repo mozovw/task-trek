@@ -1,0 +1,40 @@
+node_modules/
+
+# 构建产物
+backend/dist/
+backend/data/
+frontend/dist/
+
+# 数据库
+backend/data/
+
+# 自动生成的文件
+frontend/auto-imports.d.ts
+frontend/components.d.ts
+
+# TypeScript 增量构建
+*.tsbuildinfo
+
+# 环境配置
+.env
+.env.local
+
+# 日志
+*.log
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+
+# 编辑器/IDE 个人设置
+.idea/
+*.swp
+*.swo
+
+# 文档与设计文件
+系统设计文档.md
+CLAUDE.md
+
+# Claude 本地设置
+.claude/
+.vscode/
