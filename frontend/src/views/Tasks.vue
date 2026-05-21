@@ -31,17 +31,17 @@
             <span :class="{ 'task-done': task.status === 'done', 'counting-down': task.timerRunning }" class="task-name">{{ task.name }}</span>
             <span v-if="task.description" class="task-desc">{{ task.description }}</span>
           </div>
-          <n-tag v-if="task.estimatedMinutes > 0 && !task.timerRunning" size="small" type="info">{{ task.estimatedMinutes }}分钟</n-tag>
-          <span v-if="task.timerRunning" class="timer-display">⏱ {{ formatTimer(localRemainingSeconds[task.id] ?? task.remainingSeconds) }}</span>
+          <n-tag v-if="task.estimatedMinutes > 0 && !task.timerRunning && !localRemainingSeconds[task.id]" size="small" type="info">{{ task.estimatedMinutes }}分钟</n-tag>
+          <span v-if="task.timerRunning || localRemainingSeconds[task.id]" class="timer-display">⏱ {{ formatTimer(localRemainingSeconds[task.id] ?? task.remainingSeconds) }}</span>
         </div>
         <div class="task-actions">
           <!-- 倒计时按钮 - 仅叶子节点且有预计耗时且未完成时显示 -->
-          <n-button v-if="!task.children?.length && !task.timerRunning && task.estimatedMinutes > 0 && task.status !== 'done'" size="tiny" circle class="timer-btn start" @click="toggleTimer(task)">
+          <n-button v-if="!task.children?.length && !task.timerRunning && !localRemainingSeconds[task.id] && task.estimatedMinutes > 0 && task.status !== 'done'" size="tiny" circle class="timer-btn start" @click="toggleTimer(task)">
             <template #icon>
               <n-icon><component :is="PlayCircleOutline" /></n-icon>
             </template>
           </n-button>
-          <n-button v-if="task.timerRunning" size="tiny" quaternary circle type="warning" class="timer-btn pause" @click="toggleTimer(task)">
+          <n-button v-if="task.timerRunning || localRemainingSeconds[task.id]" size="tiny" quaternary circle type="warning" class="timer-btn pause" @click="toggleTimer(task)">
             <template #icon>
               <n-icon><PauseCircleOutline /></n-icon>
             </template>
@@ -175,11 +175,11 @@ const formatTimer = (seconds: number): string => {
 // 切换计时器（开始/暂停）
 const toggleTimer = async (task: Task) => {
   try {
-    if (task.timerRunning) {
+    if (task.timerRunning || localRemainingSeconds[task.id]) {
       // 暂停计时器
       await taskApi.pauseTimer(task.id)
       stopAllIntervals(task.id)
-      delete localRemainingSeconds.value[task.id]
+      // 不清除本地倒计时值，保留显示
       message.success('已暂停')
     } else {
       // 开始计时器
