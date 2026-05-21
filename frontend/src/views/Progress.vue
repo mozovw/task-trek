@@ -61,7 +61,7 @@ import { NIcon, NButton, useMessage } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 import * as echarts from 'echarts'
 import { Warning } from '@vicons/ionicons5'
-import { statsApi } from '@/api/modules'
+import { statsApi, taskApi } from '@/api/modules'
 import type { UnfinishedTask } from '@/types'
 
 const router = useRouter()
@@ -176,7 +176,7 @@ const unfinishedColumns: DataTableColumns<UnfinishedTask> = [
     render: (row) =>
       h(
         NButton,
-        { size: 'small', type: 'primary', onClick: () => router.push('/tasks') },
+        { size: 'small', type: 'primary', onClick: async () => { await taskApi.checkinTask(row.id); message.success('打卡成功'); loadUnfinished(); } },
         { default: () => '去打卡' }
       ),
   },

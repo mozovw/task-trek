@@ -171,7 +171,7 @@ export class TaskService {
     await this.cascadeCancelCheckin(userId, id);
 
     // 级联向上取消父任务打卡
-    await this.cascadeUpCancelCheckin(userId, task.parentId);
+    // cascadeUpCancelCheckin disabled: no upward cancel
 
     return task;
   }
