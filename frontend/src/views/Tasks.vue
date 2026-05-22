@@ -47,10 +47,10 @@
           <n-button v-if="task.level < 3 && !task.timerRunning && !task.children?.length && task.status !== 'done' && runningTaskId !== task.id" size="small" quaternary circle @click="showAddChildDialog(task)">
             <template #icon><n-icon><AddCircle /></n-icon></template>
           </n-button>
-          <n-button v-if="task.status !== 'done' && runningTaskId !== task.id" size="small" quaternary circle @click="showEditDialog(task)">
+          <n-button v-if="task.status !== 'done'" size="small" quaternary circle :disabled="runningTaskId !== null" @click="showEditDialog(task)">
             <template #icon><n-icon><Create /></n-icon></template>
           </n-button>
-          <n-button v-if="task.status !== 'done' && runningTaskId !== task.id" size="small" quaternary circle type="error" @click="deleteTask(task)">
+          <n-button v-if="task.status !== 'done'" size="small" quaternary circle type="error" :disabled="runningTaskId !== null" @click="deleteTask(task)">
             <template #icon><n-icon><Trash /></n-icon></template>
           </n-button>
         </div>
@@ -72,7 +72,7 @@
         <n-form-item label="计划日期">
           <n-date-picker v-model:value="taskForm.plannedDate" type="date" value-format="yyyy-MM-dd" style="width: 180px" />
         </n-form-item>
-        <n-form-item label="预计耗时">
+        <n-form-item v-if="!hasChildren" label="预计耗时">
           <n-input-number v-model:value="taskForm.estimatedMinutes" :min="0" />
           <span style="margin-left: 8px">分钟</span>
         </n-form-item>
@@ -119,6 +119,7 @@ const tasks = ref<Task[]>([])
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const editingId = ref<number | null>(null)
+const editingHasChildren = ref(false)
 const allTasks = ref<Task[]>([])
 
 const timerIntervals = new Map<number, number>() // taskId -> intervalId (5s sync)
@@ -164,6 +165,11 @@ const parentName = computed(() => {
   if (!taskForm.parentId) return ''
   const parent = allTasks.value.find((t) => t.id === taskForm.parentId)
   return parent ? parent.name : ''
+})
+
+const hasChildren = computed(() => {
+  if (!isEdit.value) return false
+  return editingHasChildren.value
 })
 
 // 格式化计时器显示（秒 -> MM:SS）
@@ -412,6 +418,7 @@ const showAddChildDialog = (parent: Task) => {
 const showEditDialog = (task: Task) => {
   isEdit.value = true
   editingId.value = task.id
+  editingHasChildren.value = task.children && task.children.length > 0
   taskForm.name = task.name
   taskForm.level = task.level
   taskForm.plannedDate = task.plannedDate
