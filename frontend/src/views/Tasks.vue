@@ -22,7 +22,7 @@
     <n-card  style="margin-top: 20px; min-height: 550px">
       <n-empty v-if="tasks.length === 0" description="暂无任务" />
       <div v-for="task in tasks" :key="task.id" class="task-item" :style="{ paddingLeft: (task.level - 1) * 24 + 'px' }" :class="{ 'timer-running': task.timerRunning, 'task-locked': task.status === 'done' }">
-        <div class="task-content">
+        <div class="task-content" style="position: relative;">
           <n-checkbox
             :checked="task.status === 'done'"
             @update:checked="() => toggleCheckin(task)"
@@ -31,7 +31,7 @@
             <span :class="{ 'task-done': task.status === 'done', 'counting-down': task.timerRunning }" class="task-name">{{ task.name }}</span>
             <span v-if="task.description" class="task-desc">{{ task.description }}</span>
           </div>
-          <n-tag v-if="(task.estimatedMinutes > 0 || (task.status === 'done' && task.originalEstimatedMinutes > 0)) && !task.timerRunning && !(localRemainingSeconds[task.id] && task.status !== 'done')" size="small" :type="task.status === 'done' ? 'success' : 'info'">{{ task.status === 'done' ? (task.originalEstimatedMinutes || task.estimatedMinutes) : task.estimatedMinutes }}分钟</n-tag>
+          <n-tag v-if="(task.estimatedMinutes > 0 || (task.status === 'done' && task.originalEstimatedMinutes > 0)) && !task.timerRunning && !(localRemainingSeconds[task.id] && task.status !== 'done')" size="small" class="estimated-time" :type="task.status === 'done' ? 'success' : 'info'">{{ task.status === 'done' ? (task.originalEstimatedMinutes || task.estimatedMinutes) : task.estimatedMinutes }}分钟</n-tag>
           <span v-if="(task.timerRunning || localRemainingSeconds[task.id]) && task.status !== 'done'" class="timer-display">⏱ {{ formatTimer(localRemainingSeconds[task.id] ?? task.remainingSeconds) }}</span>
         </div>
         <div class="task-actions">
@@ -418,7 +418,7 @@ const showAddChildDialog = (parent: Task) => {
 const showEditDialog = (task: Task) => {
   isEdit.value = true
   editingId.value = task.id
-  editingHasChildren.value = task.children && task.children.length > 0
+  editingHasChildren.value = (task.children?.length ?? 0) > 0
   taskForm.name = task.name
   taskForm.level = task.level
   taskForm.plannedDate = task.plannedDate
@@ -595,6 +595,7 @@ onMounted(() => {
   opacity: 0;
   transition: opacity 0.2s;
   flex-shrink: 0;
+  min-width: 90px; /* 保持按钮占位，即使按钮隐藏 */
 }
 .task-item:hover .task-actions {
   opacity: 1;
@@ -620,10 +621,13 @@ onMounted(() => {
   background: #e6f7ff;
   border-radius: 4px;
   display: inline-block;
-  position: absolute;
-  right: 120px;
-  z-index: 10;
 }
+
+/* 新增：固定预计时间标签位置 */
+.estimated-time {
+  margin-left: 8px;
+}
+
 .timer-btn.start,
 .timer-btn.pause {
   position: relative;
