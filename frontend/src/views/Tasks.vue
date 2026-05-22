@@ -31,8 +31,8 @@
             <span :class="{ 'task-done': task.status === 'done', 'counting-down': task.timerRunning }" class="task-name">{{ task.name }}</span>
             <span v-if="task.description" class="task-desc">{{ task.description }}</span>
           </div>
-          <n-tag v-if="(task.estimatedMinutes > 0 || (task.status === 'done' && task.originalEstimatedMinutes > 0)) && !task.timerRunning && !localRemainingSeconds[task.id]" size="small" :type="task.status === 'done' ? 'success' : 'info'">{{ task.status === 'done' ? (task.originalEstimatedMinutes || task.estimatedMinutes) : task.estimatedMinutes }}分钟</n-tag>
-          <span v-if="task.timerRunning || localRemainingSeconds[task.id]" class="timer-display">⏱ {{ formatTimer(localRemainingSeconds[task.id] ?? task.remainingSeconds) }}</span>
+          <n-tag v-if="(task.estimatedMinutes > 0 || (task.status === 'done' && task.originalEstimatedMinutes > 0)) && !task.timerRunning && !(localRemainingSeconds[task.id] && task.status !== 'done')" size="small" :type="task.status === 'done' ? 'success' : 'info'">{{ task.status === 'done' ? (task.originalEstimatedMinutes || task.estimatedMinutes) : task.estimatedMinutes }}分钟</n-tag>
+          <span v-if="(task.timerRunning || localRemainingSeconds[task.id]) && task.status !== 'done'" class="timer-display">⏱ {{ formatTimer(localRemainingSeconds[task.id] ?? task.remainingSeconds) }}</span>
         </div>
         <div class="task-actions">
           <!-- 去完成/暂停按钮 - 仅叶子节点且有预计耗时且未完成时显示 -->
@@ -498,10 +498,10 @@ const toggleCheckin = async (task: Task) => {
       await taskApi.cancelCheckin(task.id)
       message.success('已取消打卡')
     } else {
-      // 手动勾选完成时，清除运行中的任务ID和倒计时
+      // 手动勾选完成时，清除倒计时和运行状态
+      stopAllIntervals(task.id)
+      delete localRemainingSeconds.value[task.id]
       if (runningTaskId.value === task.id) {
-        stopAllIntervals(task.id)
-        delete localRemainingSeconds.value[task.id]
         runningTaskId.value = null
       }
       await taskApi.checkinTask(task.id)
