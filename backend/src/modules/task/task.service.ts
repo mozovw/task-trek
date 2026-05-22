@@ -53,9 +53,13 @@ export class TaskService {
 
     const saved = await this.taskRepository.save(task);
 
+    // 保存原始预计耗时
+    saved.originalEstimatedMinutes = saved.estimatedMinutes;
+    await this.taskRepository.update(saved.id, { originalEstimatedMinutes: saved.estimatedMinutes });
+
     // 如果父任务有子任务，将父任务耗时置零
-    if (task.parentId) {
-      await this.taskRepository.update(task.parentId, { estimatedMinutes: 0 });
+    if (saved.parentId) {
+      await this.taskRepository.update(saved.parentId, { estimatedMinutes: 0 });
     }
 
     return saved;
@@ -65,6 +69,9 @@ export class TaskService {
     const task = await this.taskRepository.findOne({ where: { id, userId } });
     if (!task) {
       throw new NotFoundException('任务不存在');
+    }
+    if (task.status === 'done') {
+      throw new BadRequestException('已完成的任务不可修改');
     }
 
     // 防止循环引用
@@ -86,6 +93,16 @@ export class TaskService {
     }
 
     Object.assign(task, dto);
+    // 如果修改了预计耗时，同步更新原始预计耗时
+    if (dto.estimatedMinutes !== undefined) {
+      task.originalEstimatedMinutes = dto.estimatedMinutes;
+    }
+    // 如果任务之前有倒计时，编辑时清除倒计时信息
+    if (task.timerRunning || task.remainingSeconds > 0) {
+      task.timerRunning = false;
+      task.timerStartedAt = null;
+      task.remainingSeconds = 0;
+    }
     const saved = await this.taskRepository.save(task);
 
     // 如果父任务有子任务，将父任务耗时置零
@@ -100,6 +117,9 @@ export class TaskService {
     const task = await this.taskRepository.findOne({ where: { id, userId } });
     if (!task) {
       throw new NotFoundException('任务不存在');
+    }
+    if (task.status === 'done') {
+      throw new BadRequestException('已完成的任务不可删除');
     }
 
     const descendants = await this.getDescendantIds(id);
@@ -132,8 +152,14 @@ export class TaskService {
       throw new BadRequestException('任务已打卡');
     }
 
+    // 保存当前预计耗时，用于取消时恢复
+    task.originalEstimatedMinutes = task.estimatedMinutes;
     task.status = 'done';
     task.completedAt = new Date();
+    // 重置定时信息
+    task.remainingSeconds = 0;
+    task.timerRunning = false;
+    task.timerStartedAt = null;
     await this.taskRepository.save(task);
 
     // 记录打卡
@@ -160,6 +186,8 @@ export class TaskService {
       throw new BadRequestException('任务未打卡');
     }
 
+    // 恢复预计耗时为原始值
+    task.estimatedMinutes = task.originalEstimatedMinutes;
     task.status = 'pending';
     task.completedAt = null;
     await this.taskRepository.save(task);
@@ -265,8 +293,14 @@ export class TaskService {
     const children = await this.taskRepository.find({ where: { parentId, userId } });
     for (const child of children) {
       if (child.status !== 'done') {
+        // 保存当前预计耗时，用于取消时恢复
+        child.originalEstimatedMinutes = child.estimatedMinutes;
         child.status = 'done';
         child.completedAt = completedAt;
+        // 重置定时信息
+        child.remainingSeconds = 0;
+        child.timerRunning = false;
+        child.timerStartedAt = null;
         await this.taskRepository.save(child);
 
         const checkin = new Checkin();
@@ -289,8 +323,14 @@ export class TaskService {
     const allDone = children.every((c) => c.status === 'done');
 
     if (allDone && parent.status !== 'done') {
+      // 保存当前预计耗时，用于取消时恢复
+      parent.originalEstimatedMinutes = parent.estimatedMinutes;
       parent.status = 'done';
       parent.completedAt = new Date();
+      // 重置定时信息
+      parent.remainingSeconds = 0;
+      parent.timerRunning = false;
+      parent.timerStartedAt = null;
       await this.taskRepository.save(parent);
 
       const checkin = new Checkin();
@@ -306,6 +346,8 @@ export class TaskService {
     const children = await this.taskRepository.find({ where: { parentId, userId } });
     for (const child of children) {
       if (child.status === 'done') {
+        // 恢复预计耗时为原始值
+        child.estimatedMinutes = child.originalEstimatedMinutes;
         child.status = 'pending';
         child.completedAt = null;
         await this.taskRepository.save(child);

@@ -60,6 +60,10 @@ export class Task {
   @Column({ nullable: true, type: 'datetime', name: 'timer_started_at' })
   timerStartedAt: Date | null;
 
+  // 原始预计耗时（用于任务完成时恢复）
+  @Column({ default: 0, type: 'integer', name: 'original_estimated_minutes' })
+  originalEstimatedMinutes: number;
+
   @OneToMany(() => Task, (task) => task.parent)
   children: Task[];
 

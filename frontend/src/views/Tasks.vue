@@ -21,7 +21,7 @@
 </n-card>
     <n-card  style="margin-top: 20px; min-height: 550px">
       <n-empty v-if="tasks.length === 0" description="暂无任务" />
-      <div v-for="task in tasks" :key="task.id" class="task-item" :style="{ paddingLeft: (task.level - 1) * 24 + 'px' }" :class="{ 'timer-running': task.timerRunning }">
+      <div v-for="task in tasks" :key="task.id" class="task-item" :style="{ paddingLeft: (task.level - 1) * 24 + 'px' }" :class="{ 'timer-running': task.timerRunning, 'task-locked': task.status === 'done' }">
         <div class="task-content">
           <n-checkbox
             :checked="task.status === 'done'"
@@ -31,28 +31,28 @@
             <span :class="{ 'task-done': task.status === 'done', 'counting-down': task.timerRunning }" class="task-name">{{ task.name }}</span>
             <span v-if="task.description" class="task-desc">{{ task.description }}</span>
           </div>
-          <n-tag v-if="task.estimatedMinutes > 0 && !task.timerRunning && !localRemainingSeconds[task.id]" size="small" type="info">{{ task.estimatedMinutes }}分钟</n-tag>
+          <n-tag v-if="(task.estimatedMinutes > 0 || (task.status === 'done' && task.originalEstimatedMinutes > 0)) && !task.timerRunning && !localRemainingSeconds[task.id]" size="small" :type="task.status === 'done' ? 'success' : 'info'">{{ task.status === 'done' ? (task.originalEstimatedMinutes || task.estimatedMinutes) : task.estimatedMinutes }}分钟</n-tag>
           <span v-if="task.timerRunning || localRemainingSeconds[task.id]" class="timer-display">⏱ {{ formatTimer(localRemainingSeconds[task.id] ?? task.remainingSeconds) }}</span>
         </div>
         <div class="task-actions">
-          <!-- 倒计时按钮 - 仅叶子节点且有预计耗时且未完成时显示 -->
-          <n-button v-if="!task.children?.length && !task.timerRunning && !localRemainingSeconds[task.id] && task.estimatedMinutes > 0 && task.status !== 'done'" size="tiny" circle class="timer-btn start" @click="toggleTimer(task)">
+          <!-- 去完成/暂停按钮 - 仅叶子节点且有预计耗时且未完成时显示 -->
+          <n-button v-if="!task.children?.length && task.estimatedMinutes > 0 && task.status !== 'done'" 
+            size="tiny" 
+            :disabled="runningTaskId !== null && runningTaskId !== task.id"
+            :type="task.timerRunning ? 'warning' : 'primary'"
+            @click="toggleTimer(task)">
             <template #icon>
-              <n-icon><component :is="PlayCircleOutline" /></n-icon>
+              <n-icon><component :is="task.timerRunning ? PauseCircleOutline : PlayCircleOutline" /></n-icon>
             </template>
+            {{ task.timerRunning ? '暂停' : '去完成' }}
           </n-button>
-          <n-button v-if="task.timerRunning || localRemainingSeconds[task.id]" size="tiny" quaternary circle type="warning" class="timer-btn pause" @click="toggleTimer(task)">
-            <template #icon>
-              <n-icon><PauseCircleOutline /></n-icon>
-            </template>
-          </n-button>
-          <n-button v-if="task.level < 3 && !task.timerRunning && !task.children?.length" size="tiny" quaternary circle @click="showAddChildDialog(task)">
+          <n-button v-if="task.level < 3 && !task.timerRunning && !task.children?.length && task.status !== 'done' && runningTaskId !== task.id" size="tiny" quaternary circle @click="showAddChildDialog(task)">
             <template #icon><n-icon><AddCircle /></n-icon></template>
           </n-button>
-          <n-button size="tiny" quaternary circle @click="showEditDialog(task)">
+          <n-button v-if="task.status !== 'done' && runningTaskId !== task.id" size="tiny" quaternary circle @click="showEditDialog(task)">
             <template #icon><n-icon><Create /></n-icon></template>
           </n-button>
-          <n-button size="tiny" quaternary circle type="error" @click="deleteTask(task)">
+          <n-button v-if="task.status !== 'done' && runningTaskId !== task.id" size="tiny" quaternary circle type="error" @click="deleteTask(task)">
             <template #icon><n-icon><Trash /></n-icon></template>
           </n-button>
         </div>
@@ -132,6 +132,9 @@ const unfinishedTasks = ref<UnfinishedTask[]>([])
 // 本地倒计时状态（用于每秒更新显示）
 const localRemainingSeconds = ref<Record<number, number>>({})
 
+// 全局运行中的任务ID（用于锁定其他任务的"去完成"按钮）
+const runningTaskId = ref<number | null>(null)
+
 const taskForm = reactive({
   name: '',
   level: 1,
@@ -175,15 +178,18 @@ const formatTimer = (seconds: number): string => {
 // 切换计时器（开始/暂停）
 const toggleTimer = async (task: Task) => {
   try {
-    if (task.timerRunning || localRemainingSeconds[task.id]) {
+    if (task.timerRunning) {
       // 暂停计时器
       await taskApi.pauseTimer(task.id)
       stopAllIntervals(task.id)
-      // 不清除本地倒计时值，保留显示
+      // 暂停时释放对其他任务的锁定
+      runningTaskId.value = null
       message.success('已暂停')
     } else {
       // 开始计时器
       const updatedTask = await taskApi.startTimer(task.id)
+      // 设置运行中的任务ID
+      runningTaskId.value = task.id
       // 初始化本地剩余时间
       localRemainingSeconds.value[task.id] = updatedTask.data.remainingSeconds
       // 启动本地每秒倒计时
@@ -212,6 +218,8 @@ const startLocalCountdown = (taskId: number, initialSeconds: number) => {
     // 如果倒计时结束，停止并重新加载
     if (seconds <= 0) {
       stopLocalCountdown(taskId)
+      // 清除运行中的任务ID
+      runningTaskId.value = null
       loadTasks()
     }
   }, 1000)
@@ -281,6 +289,27 @@ const loadTasks = async () => {
     tasks.value = flattenTree(data)
     const { data: all } = await taskApi.getTasks()
     allTasks.value = all
+    
+    // 只检测正在运行中的任务（timerRunning = true）
+    const runningTask = allTasks.value.find(t => t.timerRunning && t.status !== 'done')
+    if (runningTask) {
+      runningTaskId.value = runningTask.id
+      // 启动本地倒计时
+      if (runningTask.remainingSeconds > 0 && !localRemainingSeconds.value[runningTask.id]) {
+        localRemainingSeconds.value[runningTask.id] = runningTask.remainingSeconds
+        startLocalCountdown(runningTask.id, runningTask.remainingSeconds)
+        startTimerInterval(runningTask.id)
+      }
+    } else {
+      runningTaskId.value = null
+    }
+    
+    // 暂停的任务（有剩余时间但计时器未运行）也显示倒计时
+    allTasks.value.forEach(t => {
+      if (!t.timerRunning && t.remainingSeconds > 0 && t.estimatedMinutes > 0 && t.status !== 'done' && !localRemainingSeconds.value[t.id]) {
+        localRemainingSeconds.value[t.id] = t.remainingSeconds
+      }
+    })
   } catch {
     // handled
   }
@@ -420,6 +449,13 @@ const saveTask = async () => {
     }
     if (isEdit.value && editingId.value) {
       await taskApi.updateTask(editingId.value, payload)
+      // 编辑保存后清除本地倒计时状态
+      stopAllIntervals(editingId.value)
+      delete localRemainingSeconds.value[editingId.value]
+      // 如果编辑的是运行中的任务，清除runningTaskId
+      if (runningTaskId.value === editingId.value) {
+        runningTaskId.value = null
+      }
       message.success('更新成功')
     } else {
       await taskApi.createTask(payload)
@@ -440,11 +476,17 @@ const deleteTask = (task: Task) => {
     negativeText: '取消',
     onPositiveClick: async () => {
       try {
+        // 如果删除的是运行中的任务，清除运行状态
+        if (runningTaskId.value === task.id) {
+          stopAllIntervals(task.id)
+          delete localRemainingSeconds.value[task.id]
+          runningTaskId.value = null
+        }
         await taskApi.deleteTask(task.id)
         message.success('删除成功')
         loadTasks()
-      } catch {
-        // handled
+      } catch (e: any) {
+        message.error(e.message || '删除失败')
       }
     },
   })
@@ -456,12 +498,18 @@ const toggleCheckin = async (task: Task) => {
       await taskApi.cancelCheckin(task.id)
       message.success('已取消打卡')
     } else {
+      // 手动勾选完成时，清除运行中的任务ID和倒计时
+      if (runningTaskId.value === task.id) {
+        stopAllIntervals(task.id)
+        delete localRemainingSeconds.value[task.id]
+        runningTaskId.value = null
+      }
       await taskApi.checkinTask(task.id)
       message.success('打卡成功')
     }
     loadTasks()
-  } catch {
-    // handled
+  } catch (e: any) {
+    message.error(e.message || '操作失败')
   }
 }
 
@@ -548,6 +596,10 @@ onMounted(() => {
 }
 .timer-running {
   background: linear-gradient(90deg, #fff7e6 0%, #e6f7ff 100%);
+}
+.task-locked {
+  background: #f5f5f5;
+  opacity: 0.85;
 }
 .counting-down {
   color: #1890ff;

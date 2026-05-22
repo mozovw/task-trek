@@ -23,6 +23,8 @@ export interface Task {
   remainingSeconds: number
   timerRunning: boolean
   timerStartedAt: string | null
+  // 原始预计耗时（用于任务完成时恢复）
+  originalEstimatedMinutes: number
 }
 
 export interface StatsOverview {
