@@ -109,12 +109,14 @@ import { useMessage, useDialog, type DataTableColumns } from 'naive-ui'
 import { NIcon, NButton } from 'naive-ui'
 import { ChevronBack, ChevronForward, Add, AddCircle, Create, Trash, PlayCircleOutline, PauseCircleOutline } from '@vicons/ionicons5'
 import { taskApi, statsApi } from '@/api/modules'
+import { useWhiteNoiseStore } from '@/stores/whiteNoise'
 import type { Task, UnfinishedTask } from '@/types'
 
 const message = useMessage()
 const dialog = useDialog()
 const route = useRoute()
 const router = useRouter()
+const whiteNoiseStore = useWhiteNoiseStore()
 
 const now = new Date()
 const currentDate = ref((route.query.date as string) || now.toISOString().split('T')[0])
@@ -185,10 +187,6 @@ const formatTimer = (seconds: number): string => {
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
 }
 
-// 背景音乐
-const backgroundMusic = new Audio('https://www.ppbzy.com/audio/Lofi/Study/Lofi%20study%201.m4a')
-backgroundMusic.loop = true
-
 // 切换计时器（开始/暂停）
 const toggleTimer = async (task: Task) => {
   try {
@@ -196,9 +194,8 @@ const toggleTimer = async (task: Task) => {
       // 暂停计时器
       await taskApi.pauseTimer(task.id)
       stopAllIntervals(task.id)
-      // 暂停时停止背景音乐
-      backgroundMusic.pause()
-      backgroundMusic.currentTime = 0
+      // 暂停时停止白噪音
+      whiteNoiseStore.pauseNoise()
       // 暂停时释放对其他任务的锁定
       runningTaskId.value = null
       message.success('已暂停')
@@ -215,8 +212,8 @@ const toggleTimer = async (task: Task) => {
       startLocalCountdown(task.id, updatedTask.data.remainingSeconds)
       // 启动数据库同步循环（5 秒一次）
       startTimerInterval(task.id)
-      // 播放背景音乐
-      backgroundMusic.play()
+      // 播放用户选择的白噪音
+      whiteNoiseStore.playNoise()
       message.success('已开始计时')
     }
     loadTasks()
@@ -267,9 +264,8 @@ const startLocalCountdown = (taskId: number, initialSeconds: number) => {
     // 如果倒计时结束，停止并重新加载
     if (seconds <= 0) {
       stopLocalCountdown(taskId)
-      // 停止背景音乐
-      backgroundMusic.pause()
-      backgroundMusic.currentTime = 0
+      // 停止白噪音
+      whiteNoiseStore.stopNoise()
       // 播放完成提示音（仅一次）
       if (!completedTaskIds.value.has(taskId)) {
         playCompletionSound()
@@ -572,7 +568,8 @@ const toggleCheckin = async (task: Task) => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await whiteNoiseStore.loadUserSettings()
   loadTasks()
 })
 </script>

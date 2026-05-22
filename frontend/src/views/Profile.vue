@@ -1,6 +1,6 @@
 <template>
   <div class="profile-page">
-    <n-card title="个人信息"  style="margin-top: 20px" >
+    <n-card title="个人信息" style="margin-top: 20px">
       <n-form label-placement="left" label-width="100">
         <n-form-item label="用户名">
           <span>{{ userStore.user?.username }}</span>
@@ -22,31 +22,48 @@
         </n-form-item>
         <n-form-item label="确认新密码" path="newPasswordConfirm">
           <n-input v-model:value="passwordForm.newPasswordConfirm" type="password" show-password-on="click" style="width: 200px" @keyup.enter="changePassword" />
+                <n-button type="primary"  style="margin-left: 8px" size="small" @click="changePassword">修改密码</n-button>
+
         </n-form-item>
-        <n-form-item>
-          <n-button type="primary" @click="changePassword">修改密码</n-button>
-        </n-form-item>
+     
       </n-form>
     </n-card>
 
     <n-card style="margin-top: 20px" title="数据管理">
       <div class="data-actions">
-        <n-button type="primary" @click="exportMarkdown">导出 Markdown</n-button>
-        <n-button @click="downloadTemplate">下载模板</n-button>
-        <n-button type="warning" @click="showImportDialog">导入 Markdown</n-button>
-        <n-button type="error" @click="clearAllTasks">清空所有任务</n-button>
+        <n-button type="primary" size="small" @click="exportMarkdown">导出 Markdown</n-button>
+        <n-button size="small" @click="downloadTemplate">下载模板</n-button>
+        <n-button type="warning" size="small" @click="showImportDialog">导入 Markdown</n-button>
+        <n-button type="error" size="small" @click="clearAllTasks">清空所有任务</n-button>
       </div>
+    </n-card>
+
+    <n-card style="margin-top: 20px" title="白噪音设置">
+      <n-form label-placement="left" label-width="100">
+        <n-form-item label="选择白噪音">
+          <n-radio-group v-model:value="selectedNoiseId" name="whiteNoise" @update:value="handleNoiseChange">
+            <n-space>
+              <n-radio 
+                v-for="noise in whiteNoiseOptions" 
+                :key="noise.id" 
+                :value="noise.id"
+                :label="noise.name"
+              />
+            </n-space>
+          </n-radio-group>
+        </n-form-item>
+      </n-form>
     </n-card>
 
     <!-- 导入对话框 -->
     <n-modal v-model:show="importDialogVisible" preset="dialog" title="导入 Markdown">
       <n-upload accept=".md" :max="1" :show-file-list="true" @change="handleFileChange">
-        <n-button>选择 Markdown 文件</n-button>
+        <n-button size="small">选择 Markdown 文件</n-button>
       </n-upload>
       <template #action>
         <n-space>
-          <n-button @click="importDialogVisible = false">取消</n-button>
-          <n-button type="primary" :disabled="!fileContent" @click="importMarkdown">导入</n-button>
+          <n-button size="small" @click="importDialogVisible = false">取消</n-button>
+          <n-button size="small" type="primary" :disabled="!fileContent" @click="importMarkdown">导入</n-button>
         </n-space>
       </template>
     </n-modal>
@@ -59,13 +76,20 @@ import { useMessage, useDialog } from 'naive-ui'
 import type { FormInst } from 'naive-ui'
 import { userApi, authApi, exportApi } from '@/api/modules'
 import { useUserStore } from '@/stores/user'
+import { useWhiteNoiseStore, whiteNoiseOptions } from '@/stores/whiteNoise'
 
 const message = useMessage()
 const dialog = useDialog()
 const userStore = useUserStore()
+const whiteNoiseStore = useWhiteNoiseStore()
+
 const passwordFormRef = ref<FormInst | null>(null)
 const importDialogVisible = ref(false)
 const fileContent = ref('')
+
+// 白噪音相关
+const selectedNoiseId = ref<string | null>(null)
+const previewTimer = ref<number | null>(null)
 
 const handleFileChange = ({ file }: any) => {
   const rawFile = file.file
@@ -205,8 +229,47 @@ const clearAllTasks = () => {
   })
 }
 
-onMounted(() => {
+// 白噪音相关方法
+const handleNoiseChange = async (noiseId: string) => {
+  // 清除之前的定时器
+  if (previewTimer.value) {
+    clearTimeout(previewTimer.value)
+    previewTimer.value = null
+  }
+
+  if (!noiseId || noiseId === 'none') {
+    whiteNoiseStore.stopNoise()
+    // 自动保存选择
+    try {
+      await whiteNoiseStore.setSelectedNoise(noiseId)
+    } catch {
+      message.error('保存失败')
+    }
+    return
+  }
+
+  whiteNoiseStore.playNoise(noiseId)
+  message.success('正在试听白噪音（5秒后自动停止），设置已保存')
+
+  // 5秒后自动停止
+  previewTimer.value = window.setTimeout(() => {
+    whiteNoiseStore.stopNoise()
+    previewTimer.value = null
+  }, 5000)
+
+  // 自动保存选择
+  try {
+    await whiteNoiseStore.setSelectedNoise(noiseId)
+  } catch {
+    message.error('保存失败')
+  }
+}
+
+onMounted(async () => {
   nameForm.name = userStore.user?.name || ''
+  // 加载用户的白噪音设置
+  await whiteNoiseStore.loadUserSettings()
+  selectedNoiseId.value = whiteNoiseStore.selectedNoiseId
 })
 </script>
 

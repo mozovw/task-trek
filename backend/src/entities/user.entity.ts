@@ -20,6 +20,9 @@ export class User {
   @Column({ default: false })
   isAdmin: boolean;
 
+  @Column({ nullable: true, type: 'text' })
+  whiteNoiseUrl: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

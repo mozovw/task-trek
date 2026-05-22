@@ -3,6 +3,7 @@ export interface User {
   username: string
   name: string
   isAdmin: boolean
+  whiteNoiseUrl?: string | null
 }
 
 export interface Task {

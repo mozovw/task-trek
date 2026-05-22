@@ -15,7 +15,13 @@ export class UserService {
     if (!user) {
       throw new BadRequestException('用户不存在');
     }
-    return { id: user.id, username: user.username, name: user.name, isAdmin: user.isAdmin };
+    return { 
+      id: user.id, 
+      username: user.username, 
+      name: user.name, 
+      isAdmin: user.isAdmin,
+      whiteNoiseUrl: user.whiteNoiseUrl,
+    };
   }
 
   async updateName(userId: number, name: string) {
@@ -24,5 +30,18 @@ export class UserService {
     }
     await this.userRepository.update(userId, { name });
     return this.getUserInfo(userId);
+  }
+
+  async getWhiteNoiseUrl(userId: number) {
+    const user = await this.userRepository.findOne({ where: { id: userId }, select: ['whiteNoiseUrl'] });
+    if (!user) {
+      throw new BadRequestException('用户不存在');
+    }
+    return { whiteNoiseUrl: user.whiteNoiseUrl };
+  }
+
+  async updateWhiteNoiseUrl(userId: number, whiteNoiseUrl: string | null) {
+    await this.userRepository.update(userId, { whiteNoiseUrl });
+    return this.getWhiteNoiseUrl(userId);
   }
 }

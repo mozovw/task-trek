@@ -21,6 +21,12 @@ export const userApi = {
 
   updateName: (name: string) =>
     api.put<User>('/user/name', { name }),
+
+  getWhiteNoiseUrl: () =>
+    api.get<{ whiteNoiseUrl: string | null }>('/user/settings/white-noise'),
+
+  updateWhiteNoiseUrl: (whiteNoiseUrl: string | null) =>
+    api.put<{ whiteNoiseUrl: string | null }>('/user/settings/white-noise', { whiteNoiseUrl }),
 }
 
 export const taskApi = {
