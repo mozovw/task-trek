@@ -31,8 +31,8 @@
             <span :class="{ 'task-done': task.status === 'done', 'counting-down': task.timerRunning }" class="task-name">{{ task.name }}</span>
             <span v-if="task.description" class="task-desc">{{ task.description }}</span>
           </div>
-          <n-tag v-if="(task.estimatedMinutes > 0 || (task.status === 'done' && task.originalEstimatedMinutes > 0)) && !task.timerRunning && !(localRemainingSeconds[task.id] && task.status !== 'done')" size="small" class="estimated-time" :type="task.status === 'done' ? 'success' : 'info'">{{ task.status === 'done' ? (task.originalEstimatedMinutes || task.estimatedMinutes) : task.estimatedMinutes }}分钟</n-tag>
-          <span v-if="(task.timerRunning || localRemainingSeconds[task.id]) && task.status !== 'done'" class="timer-display">⏱ {{ formatTimer(localRemainingSeconds[task.id] ?? task.remainingSeconds) }}</span>
+          <n-tag v-if="(task.estimatedMinutes > 0 || (task.status === 'done' && task.originalEstimatedMinutes > 0)) && !task.timerRunning && !(localRemainingSeconds[task.id] && task.status !== 'done')" size="small" :type="task.status === 'done' ? 'success' : 'info'">{{ task.status === 'done' ? (task.originalEstimatedMinutes || task.estimatedMinutes) : task.estimatedMinutes }}分钟</n-tag>
+          <span v-if="(task.timerRunning || localRemainingSeconds[task.id]) && task.status !== 'done'" class="timer-display"><n-tag size="small" type="info">⏱ {{ formatTimer(localRemainingSeconds[task.id] ?? task.remainingSeconds) }}</n-tag></span>
         </div>
         <div class="task-actions">
           <!-- 去完成/暂停按钮 - 仅叶子节点且有预计耗时且未完成时显示 -->
@@ -611,22 +611,7 @@ onMounted(() => {
   color: #1890ff;
   font-weight: bold;
 }
-.timer-display {
-  font-size: 13px;
-  color: #1890ff;
-  font-weight: bold;
-  white-space: nowrap;
-  margin-left: 8px;
-  padding: 2px 8px;
-  background: #e6f7ff;
-  border-radius: 4px;
-  display: inline-block;
-}
 
-/* 新增：固定预计时间标签位置 */
-.estimated-time {
-  margin-left: 8px;
-}
 
 .timer-btn.start,
 .timer-btn.pause {

@@ -1,5 +1,5 @@
 ---
-name: skills-Naive-UI-SKILL-master-6341baee6fba09ad3787492ec433bc78084bae8c
+name: skills-Naive-UI-SKILL
 description: Naive UI 是一个基于 Vue 3 + TypeScript 的 UI 组件库，提供 90+ 个组件。
 ---
 
