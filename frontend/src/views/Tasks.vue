@@ -37,22 +37,20 @@
         <div class="task-actions">
           <!-- 去完成/暂停按钮 - 仅叶子节点且有预计耗时且未完成时显示 -->
           <n-button v-if="!task.children?.length && task.estimatedMinutes > 0 && task.status !== 'done'" 
-            size="tiny" 
+            size="small" 
+            quaternary circle
             :disabled="runningTaskId !== null && runningTaskId !== task.id"
             :type="task.timerRunning ? 'warning' : 'primary'"
             @click="toggleTimer(task)">
-            <template #icon>
-              <n-icon><component :is="task.timerRunning ? PauseCircleOutline : PlayCircleOutline" /></n-icon>
-            </template>
-            {{ task.timerRunning ? '暂停' : '去完成' }}
+            <template #icon><n-icon><component :is="task.timerRunning ? PauseCircleOutline : PlayCircleOutline" /></n-icon></template>
           </n-button>
-          <n-button v-if="task.level < 3 && !task.timerRunning && !task.children?.length && task.status !== 'done' && runningTaskId !== task.id" size="tiny" quaternary circle @click="showAddChildDialog(task)">
+          <n-button v-if="task.level < 3 && !task.timerRunning && !task.children?.length && task.status !== 'done' && runningTaskId !== task.id" size="small" quaternary circle @click="showAddChildDialog(task)">
             <template #icon><n-icon><AddCircle /></n-icon></template>
           </n-button>
-          <n-button v-if="task.status !== 'done' && runningTaskId !== task.id" size="tiny" quaternary circle @click="showEditDialog(task)">
+          <n-button v-if="task.status !== 'done' && runningTaskId !== task.id" size="small" quaternary circle @click="showEditDialog(task)">
             <template #icon><n-icon><Create /></n-icon></template>
           </n-button>
-          <n-button v-if="task.status !== 'done' && runningTaskId !== task.id" size="tiny" quaternary circle type="error" @click="deleteTask(task)">
+          <n-button v-if="task.status !== 'done' && runningTaskId !== task.id" size="small" quaternary circle type="error" @click="deleteTask(task)">
             <template #icon><n-icon><Trash /></n-icon></template>
           </n-button>
         </div>
