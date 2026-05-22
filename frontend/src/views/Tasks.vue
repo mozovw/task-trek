@@ -134,6 +134,9 @@ const unfinishedTasks = ref<UnfinishedTask[]>([])
 // 本地倒计时状态（用于每秒更新显示）
 const localRemainingSeconds = ref<Record<number, number>>({})
 
+// 已完成并播放过提示音的任务ID集合
+const completedTaskIds = ref<Set<number>>(new Set())
+
 // 全局运行中的任务ID（用于锁定其他任务的"去完成"按钮）
 const runningTaskId = ref<number | null>(null)
 
@@ -201,6 +204,8 @@ const toggleTimer = async (task: Task) => {
       message.success('已暂停')
     } else {
       // 开始计时器
+      // 清除该任务的完成标记（允许下次播放提示音）
+      completedTaskIds.value.delete(task.id)
       const updatedTask = await taskApi.startTimer(task.id)
       // 设置运行中的任务 ID
       runningTaskId.value = task.id
@@ -265,8 +270,11 @@ const startLocalCountdown = (taskId: number, initialSeconds: number) => {
       // 停止背景音乐
       backgroundMusic.pause()
       backgroundMusic.currentTime = 0
-      // 播放完成提示音
-      playCompletionSound()
+      // 播放完成提示音（仅一次）
+      if (!completedTaskIds.value.has(taskId)) {
+        playCompletionSound()
+        completedTaskIds.value.add(taskId)
+      }
       // 清除运行中的任务 ID
       runningTaskId.value = null
       loadTasks()
