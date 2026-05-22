@@ -30,9 +30,11 @@
           <div class="task-info">
             <span :class="{ 'task-done': task.status === 'done', 'counting-down': task.timerRunning }" class="task-name">{{ task.name }}</span>
             <span v-if="task.description" class="task-desc">{{ task.description }}</span>
+            <div class="task-meta">
+              <n-tag v-if="(task.estimatedMinutes > 0 || (task.status === 'done' && task.originalEstimatedMinutes > 0)) && !task.timerRunning && !(localRemainingSeconds[task.id] && task.status !== 'done')" size="small" :type="task.status === 'done' ? 'success' : 'info'">{{ task.status === 'done' ? (task.originalEstimatedMinutes || task.estimatedMinutes) : task.estimatedMinutes }}分钟</n-tag>
+              <span v-if="(task.timerRunning || localRemainingSeconds[task.id]) && task.status !== 'done'" class="timer-display"><n-tag size="small" type="info">⏱ {{ formatTimer(localRemainingSeconds[task.id] ?? task.remainingSeconds) }}</n-tag></span>
+            </div>
           </div>
-          <n-tag v-if="(task.estimatedMinutes > 0 || (task.status === 'done' && task.originalEstimatedMinutes > 0)) && !task.timerRunning && !(localRemainingSeconds[task.id] && task.status !== 'done')" size="small" :type="task.status === 'done' ? 'success' : 'info'">{{ task.status === 'done' ? (task.originalEstimatedMinutes || task.estimatedMinutes) : task.estimatedMinutes }}分钟</n-tag>
-          <span v-if="(task.timerRunning || localRemainingSeconds[task.id]) && task.status !== 'done'" class="timer-display"><n-tag size="small" type="info">⏱ {{ formatTimer(localRemainingSeconds[task.id] ?? task.remainingSeconds) }}</n-tag></span>
         </div>
         <div class="task-actions">
           <!-- 去完成/暂停按钮 - 仅叶子节点且有预计耗时且未完成时显示 -->
@@ -44,7 +46,7 @@
             @click="toggleTimer(task)">
             <template #icon><n-icon><component :is="task.timerRunning ? PauseCircleOutline : PlayCircleOutline" /></n-icon></template>
           </n-button>
-          <n-button v-if="task.level < 3 && !task.timerRunning && !task.children?.length && task.status !== 'done' && runningTaskId !== task.id" size="small" quaternary circle @click="showAddChildDialog(task)">
+          <n-button v-if="task.level < 3 && task.status !== 'done'" size="small" quaternary circle :disabled="task.timerRunning || runningTaskId !== null" @click="showAddChildDialog(task)">
             <template #icon><n-icon><AddCircle /></n-icon></template>
           </n-button>
           <n-button v-if="task.status !== 'done'" size="small" quaternary circle :disabled="runningTaskId !== null" @click="showEditDialog(task)">
@@ -585,6 +587,11 @@ onMounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.task-meta {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
 }
 .task-done {
   text-decoration: line-through;
