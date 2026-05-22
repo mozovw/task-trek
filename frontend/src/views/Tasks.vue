@@ -89,7 +89,7 @@
     </n-modal>
 
     <!-- 未完成任务弹窗 -->
-    <n-modal v-model:show="showUnfinishedModal" preset="dialog" title="未完成任务">
+    <n-modal v-model:show="showUnfinishedModal" preset="dialog" title="未完成任务" :style="{ width: '500px' }">
       <n-data-table
         :columns="unfinishedColumns"
         :data="unfinishedTasks"
@@ -102,7 +102,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed, h, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useMessage, useDialog, type DataTableColumns } from 'naive-ui'
 import { NIcon, NButton } from 'naive-ui'
 import { ChevronBack, ChevronForward, Add, AddCircle, Create, Trash, PlayCircleOutline, PauseCircleOutline } from '@vicons/ionicons5'
@@ -112,6 +112,7 @@ import type { Task, UnfinishedTask } from '@/types'
 const message = useMessage()
 const dialog = useDialog()
 const route = useRoute()
+const router = useRouter()
 
 const now = new Date()
 const currentDate = ref((route.query.date as string) || now.toISOString().split('T')[0])
@@ -380,13 +381,14 @@ const unfinishedColumns: DataTableColumns<UnfinishedTask> = [
         {
           size: 'small',
           type: 'primary',
-          onClick: async () => {
-            await taskApi.checkinTask(row.id)
-            message.success('打卡成功')
-            loadUnfinished()
+          onClick: () => {
+            currentDate.value = row.plannedDate
+            router.push({ query: { date: row.plannedDate } })
+            showUnfinishedModal.value = false
+            loadTasks()
           },
         },
-        '打卡'
+        '去完成'
       ),
   },
 ]
