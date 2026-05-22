@@ -182,6 +182,10 @@ const formatTimer = (seconds: number): string => {
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
 }
 
+// 背景音乐
+const backgroundMusic = new Audio('https://www.ppbzy.com/audio/Lofi/Study/Lofi%20study%201.m4a')
+backgroundMusic.loop = true
+
 // 切换计时器（开始/暂停）
 const toggleTimer = async (task: Task) => {
   try {
@@ -189,13 +193,16 @@ const toggleTimer = async (task: Task) => {
       // 暂停计时器
       await taskApi.pauseTimer(task.id)
       stopAllIntervals(task.id)
+      // 暂停时停止背景音乐
+      backgroundMusic.pause()
+      backgroundMusic.currentTime = 0
       // 暂停时释放对其他任务的锁定
       runningTaskId.value = null
       message.success('已暂停')
     } else {
       // 开始计时器
       const updatedTask = await taskApi.startTimer(task.id)
-      // 设置运行中的任务ID
+      // 设置运行中的任务 ID
       runningTaskId.value = task.id
       // 初始化本地剩余时间
       localRemainingSeconds.value[task.id] = updatedTask.data.remainingSeconds
@@ -203,12 +210,42 @@ const toggleTimer = async (task: Task) => {
       startLocalCountdown(task.id, updatedTask.data.remainingSeconds)
       // 启动数据库同步循环（5 秒一次）
       startTimerInterval(task.id)
+      // 播放背景音乐
+      backgroundMusic.play()
       message.success('已开始计时')
     }
     loadTasks()
   } catch (e: any) {
     message.error(e.message || '操作失败')
   }
+}
+
+// 启动本地每秒倒计时（仅更新显示，不同步 DB）
+const playCompletionSound = () => {
+  const ctx = new AudioContext()
+  const currentTime = ctx.currentTime
+
+  const osc1 = ctx.createOscillator()
+  const gain1 = ctx.createGain()
+  osc1.type = 'sine'
+  osc1.frequency.setValueAtTime(880, currentTime)
+  gain1.gain.setValueAtTime(0.3, currentTime)
+  osc1.connect(gain1)
+  gain1.connect(ctx.destination)
+  osc1.start(currentTime)
+  osc1.stop(currentTime + 0.15)
+
+  const osc2 = ctx.createOscillator()
+  const gain2 = ctx.createGain()
+  osc2.type = 'sine'
+  osc2.frequency.setValueAtTime(1320, currentTime + 0.15)
+  gain2.gain.setValueAtTime(0, currentTime)
+  gain2.gain.linearRampToValueAtTime(0.3, currentTime + 0.15)
+  gain2.gain.linearRampToValueAtTime(0, currentTime + 0.35)
+  osc2.connect(gain2)
+  gain2.connect(ctx.destination)
+  osc2.start(currentTime + 0.15)
+  osc2.stop(currentTime + 0.35)
 }
 
 // 启动本地每秒倒计时（仅更新显示，不同步 DB）
@@ -225,7 +262,12 @@ const startLocalCountdown = (taskId: number, initialSeconds: number) => {
     // 如果倒计时结束，停止并重新加载
     if (seconds <= 0) {
       stopLocalCountdown(taskId)
-      // 清除运行中的任务ID
+      // 停止背景音乐
+      backgroundMusic.pause()
+      backgroundMusic.currentTime = 0
+      // 播放完成提示音
+      playCompletionSound()
+      // 清除运行中的任务 ID
       runningTaskId.value = null
       loadTasks()
     }
