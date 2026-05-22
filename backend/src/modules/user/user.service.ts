@@ -33,7 +33,7 @@ export class UserService {
   }
 
   async getWhiteNoiseUrl(userId: number) {
-    const user = await this.userRepository.findOne({ where: { id: userId }, select: ['whiteNoiseUrl'] });
+    const user = await this.userRepository.findOne({ where: { id: userId }, select: { whiteNoiseUrl: true } });
     if (!user) {
       throw new BadRequestException('用户不存在');
     }
