@@ -127,8 +127,7 @@ const editingId = ref<number | null>(null)
 const editingHasChildren = ref(false)
 const allTasks = ref<Task[]>([])
 
-const timerIntervals = new Map<number, number>() // taskId -> intervalId (5s sync)
-const localTimerIntervals = new Map<number, number>() // taskId -> intervalId (1s local countdown)
+const timerIntervals = new Map<number, number>() // taskId -> intervalId (1s sync + countdown)
 
 const showUnfinishedModal = ref(false)
 const unfinishedTasks = ref<UnfinishedTask[]>([])
@@ -208,10 +207,8 @@ const toggleTimer = async (task: Task) => {
       runningTaskId.value = task.id
       // 初始化本地剩余时间
       localRemainingSeconds.value[task.id] = updatedTask.data.remainingSeconds
-      // 启动本地每秒倒计时
-      startLocalCountdown(task.id, updatedTask.data.remainingSeconds)
-      // 启动数据库同步循环（5 秒一次）
-      startTimerInterval(task.id)
+      // 启动倒计时（每秒同步到数据库）
+      startTimer(task.id, updatedTask.data.remainingSeconds)
       // 播放用户选择的白噪音
       whiteNoiseStore.playNoise()
       message.success('已开始计时')
@@ -250,72 +247,60 @@ const playCompletionSound = () => {
   osc2.stop(currentTime + 0.35)
 }
 
-// 启动本地每秒倒计时（仅更新显示，不同步 DB）
-const startLocalCountdown = (taskId: number, initialSeconds: number) => {
+// 任务完成时的统一处理
+const handleTaskComplete = (taskId: number) => {
+  stopTimer(taskId)
+  whiteNoiseStore.stopNoise()
+  runningTaskId.value = null
+  playCompletionSound()
+}
+
+// 启动倒计时循环（每秒本地倒计时 + 同步到数据库）
+const startTimer = (taskId: number, initialSeconds: number) => {
   let seconds = initialSeconds
+  let isSyncing = false
   
-  // 如果有之前的定时器，先清除
-  stopLocalCountdown(taskId)
+  stopTimer(taskId)
   
-  const interval = window.setInterval(() => {
+  const interval = window.setInterval(async () => {
     seconds--
     localRemainingSeconds.value[taskId] = seconds
     
-    // 不断检查任务状态是否已完成
+    // 本地检查任务是否已完成
     const task = tasks.value.find(t => t.id === taskId)
-    if (task && task.status === 'done') {
-      stopLocalCountdown(taskId)
-      whiteNoiseStore.stopNoise()
-      runningTaskId.value = null
-      playCompletionSound()
+    if (task?.status === 'done') {
+      handleTaskComplete(taskId)
       return
     }
-  
+    
+    // 异步同步到数据库（不阻塞倒计时）
+    if (!isSyncing) {
+      isSyncing = true
+      try {
+        const { data } = await taskApi.syncTimer(taskId)
+        // 用同步返回的数据更新本地状态，避免全量 reload
+        if (data.status === 'done') {
+          handleTaskComplete(taskId)
+          await loadTasks() // 完成时刷新列表
+          return
+        }
+        if (data.timerRunning && data.remainingSeconds > 0) {
+          seconds = data.remainingSeconds
+          localRemainingSeconds.value[taskId] = seconds
+        }
+      } catch {
+        // ignore sync errors, local countdown continues
+      } finally {
+        isSyncing = false
+      }
+    }
   }, 1000)
   
-  localTimerIntervals.set(taskId, interval)
-}
-
-// 停止本地倒计时
-const stopLocalCountdown = (taskId: number) => {
-  const interval = localTimerIntervals.get(taskId)
-  if (interval) {
-    window.clearInterval(interval)
-    localTimerIntervals.delete(taskId)
-  }
-}
-
-// 启动本地倒计时循环（每 5 秒同步一次到数据库）
-const startTimerInterval = (taskId: number) => {
-  const interval = window.setInterval(async () => {
-    try {
-      await taskApi.syncTimer(taskId)
-      // 重新加载任务列表以更新本地状态
-      await loadTasks()
-      // 同步后检查任务状态，如果已完成则停止同步
-      const updatedTask = tasks.value.find(t => t.id === taskId)
-      if (!updatedTask || updatedTask.status === 'done') {
-        stopTimerInterval(taskId)
-        if (updatedTask && updatedTask.status === 'done') {
-          whiteNoiseStore.stopNoise()
-          runningTaskId.value = null
-          playCompletionSound()
-        }
-        return
-      }
-      if (updatedTask.timerRunning && updatedTask.remainingSeconds > 0) {
-        localRemainingSeconds.value[taskId] = updatedTask.remainingSeconds
-        startLocalCountdown(taskId, updatedTask.remainingSeconds)
-      }
-    } catch {
-      // ignore sync errors
-    }
-  }, 5000)
   timerIntervals.set(taskId, interval)
 }
 
-// 停止计时器循环
-const stopTimerInterval = (taskId: number) => {
+// 停止倒计时
+const stopTimer = (taskId: number) => {
   const interval = timerIntervals.get(taskId)
   if (interval) {
     window.clearInterval(interval)
@@ -323,10 +308,9 @@ const stopTimerInterval = (taskId: number) => {
   }
 }
 
-// 停止所有定时器（本地 + 同步）
+// 停止所有定时器
 const stopAllIntervals = (taskId: number) => {
-  stopTimerInterval(taskId)
-  stopLocalCountdown(taskId)
+  stopTimer(taskId)
 }
 
 // 清理所有计时器循环
@@ -334,11 +318,7 @@ onUnmounted(() => {
   timerIntervals.forEach((interval) => {
     window.clearInterval(interval)
   })
-  localTimerIntervals.forEach((interval) => {
-    window.clearInterval(interval)
-  })
   timerIntervals.clear()
-  localTimerIntervals.clear()
 })
 
 const loadTasks = async () => {
@@ -352,11 +332,10 @@ const loadTasks = async () => {
     const runningTask = allTasks.value.find(t => t.timerRunning && t.status !== 'done')
     if (runningTask) {
       runningTaskId.value = runningTask.id
-      // 启动本地倒计时
+      // 启动倒计时（每秒同步到数据库）
       if (runningTask.remainingSeconds > 0 && !localRemainingSeconds.value[runningTask.id]) {
         localRemainingSeconds.value[runningTask.id] = runningTask.remainingSeconds
-        startLocalCountdown(runningTask.id, runningTask.remainingSeconds)
-        startTimerInterval(runningTask.id)
+        startTimer(runningTask.id, runningTask.remainingSeconds)
       }
       // 页面刷新后继续播放白噪音
       console.log('检测到运行中的任务，尝试播放白噪音，selectedNoiseId:', whiteNoiseStore.selectedNoiseId)
