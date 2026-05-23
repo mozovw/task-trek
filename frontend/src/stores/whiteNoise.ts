@@ -45,11 +45,11 @@ export const useWhiteNoiseStore = defineStore('whiteNoise', () => {
     return noise ? noise.id : null
   }
 
-  // 从白噪音 ID 获取 URL
+  // 从白噪音 ID 获取 URL（"无"时返回空字符串以通过后端验证）
   const getNoiseUrlById = (noiseId: string | null): string | null => {
-    if (!noiseId) return null
+    if (!noiseId || noiseId === 'none') return ''
     const noise = whiteNoiseOptions.find(n => n.id === noiseId)
-    return noise ? noise.url : null
+    return noise ? noise.url : ''
   }
 
   // 加载用户设置（从后端）

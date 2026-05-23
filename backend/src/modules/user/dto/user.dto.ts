@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, MaxLength, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, MaxLength, Allow } from 'class-validator';
 
 export class UpdateNameDto {
   @IsString()
@@ -8,8 +8,6 @@ export class UpdateNameDto {
 }
 
 export class UpdateWhiteNoiseDto {
-  @IsString()
-  @IsOptional()
-  @MaxLength(255)
+  @Allow()
   whiteNoiseUrl: string | null;
 }

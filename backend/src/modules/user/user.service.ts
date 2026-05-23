@@ -33,7 +33,7 @@ export class UserService {
   }
 
   async getWhiteNoiseUrl(userId: number) {
-    const user = await this.userRepository.findOne({ where: { id: userId }, select: { whiteNoiseUrl: true } });
+    const user = await this.userRepository.findOne({ where: { id: userId }, select: { id: true, whiteNoiseUrl: true } });
     if (!user) {
       throw new BadRequestException('用户不存在');
     }
@@ -41,7 +41,9 @@ export class UserService {
   }
 
   async updateWhiteNoiseUrl(userId: number, whiteNoiseUrl: string | null) {
-    await this.userRepository.update(userId, { whiteNoiseUrl });
+    // 空字符串视为 null，统一存储格式
+    const normalizedUrl = whiteNoiseUrl === '' ? null : whiteNoiseUrl;
+    await this.userRepository.update(userId, { whiteNoiseUrl: normalizedUrl });
     return this.getWhiteNoiseUrl(userId);
   }
 }

@@ -1,7 +1,7 @@
 import { Controller, Get, Put, Body, UseGuards, Req } from '@nestjs/common';
 import { UserService } from './user.service';
 import { JwtAuthGuard } from '../../guards/jwt-auth.guard';
-import { UpdateNameDto, UpdateWhiteNoiseDto } from './dto/user.dto';
+import { UpdateNameDto } from './dto/user.dto';
 
 @Controller('user')
 @UseGuards(JwtAuthGuard)
@@ -24,7 +24,7 @@ export class UserController {
   }
 
   @Put('settings/white-noise')
-  async updateWhiteNoiseUrl(@Req() req: any, @Body() body: UpdateWhiteNoiseDto) {
-    return this.userService.updateWhiteNoiseUrl(req.user.userId, body.whiteNoiseUrl);
+  async updateWhiteNoiseUrl(@Req() req: any, @Body('whiteNoiseUrl') whiteNoiseUrl: any) {
+    return this.userService.updateWhiteNoiseUrl(req.user.userId, whiteNoiseUrl ?? null);
   }
 }
