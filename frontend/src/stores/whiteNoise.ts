@@ -77,21 +77,49 @@ export const useWhiteNoiseStore = defineStore('whiteNoise', () => {
   const playNoise = async (noiseId?: string) => {
     initAudio()
     const targetId = noiseId || selectedNoiseId.value
-    if (!targetId || targetId === 'none') return
+    console.log('playNoise called, targetId:', targetId, 'selectedNoiseId:', selectedNoiseId.value)
+    
+    if (!targetId || targetId === 'none') {
+      console.log('No noise selected or selected "none", skipping play')
+      return
+    }
 
     const noise = whiteNoiseOptions.find(n => n.id === targetId)
-    if (!noise || !noise.url) return
+    if (!noise || !noise.url) {
+      console.log('Noise not found or no URL, skipping play')
+      return
+    }
 
-    // 如果当前播放的不是目标音频，切换音频
-    if (audio.value && audio.value.src !== noise.url) {
-      audio.value.src = noise.url
-      audio.value.currentTime = 0
+    console.log('Attempting to play:', noise.name, 'URL:', noise.url)
+
+    // 设置音频源
+    if (!audio.value || audio.value.src !== noise.url) {
+      audio.value = new Audio(noise.url)
+      audio.value.loop = true
+      console.log('Audio source set to:', noise.url)
     }
 
     try {
-      await audio.value?.play()
-    } catch {
-      // ignore play errors
+      await audio.value.play()
+      console.log('White noise playing successfully:', noise.name)
+    } catch (e: any) {
+      console.error('播放失败:', e.name, e.message)
+      // 如果自动播放被阻止，等待用户交互后重试
+      if (e.name === 'NotAllowedError') {
+        console.warn('白噪音自动播放被浏览器阻止，点击页面任意位置后会自动播放')
+        const resumeAudio = async () => {
+          try {
+            await audio.value!.play()
+            console.log('用户交互后白噪音开始播放')
+          } catch (e2: any) {
+            console.error('用户交互后播放仍然失败:', e2)
+          }
+          document.removeEventListener('click', resumeAudio)
+          document.removeEventListener('keydown', resumeAudio)
+        }
+        document.addEventListener('click', resumeAudio, { once: true })
+        document.addEventListener('keydown', resumeAudio, { once: true })
+      }
     }
   }
 

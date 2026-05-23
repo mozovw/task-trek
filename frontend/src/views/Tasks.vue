@@ -261,20 +261,16 @@ const startLocalCountdown = (taskId: number, initialSeconds: number) => {
     seconds--
     localRemainingSeconds.value[taskId] = seconds
     
-    // 如果倒计时结束，停止并重新加载
-    if (seconds <= 0) {
+    // 不断检查任务状态是否已完成
+    const task = tasks.value.find(t => t.id === taskId)
+    if (task && task.status === 'done') {
       stopLocalCountdown(taskId)
-      // 停止白噪音
       whiteNoiseStore.stopNoise()
-      // 播放完成提示音（仅一次）
-      if (!completedTaskIds.value.has(taskId)) {
-        playCompletionSound()
-        completedTaskIds.value.add(taskId)
-      }
-      // 清除运行中的任务 ID
       runningTaskId.value = null
-      loadTasks()
+      playCompletionSound()
+      return
     }
+  
   }, 1000)
   
   localTimerIntervals.set(taskId, interval)
@@ -296,11 +292,20 @@ const startTimerInterval = (taskId: number) => {
       await taskApi.syncTimer(taskId)
       // 重新加载任务列表以更新本地状态
       await loadTasks()
-      // 同步后重置本地倒计时
-      const task = tasks.value.find(t => t.id === taskId)
-      if (task && task.timerRunning && task.remainingSeconds > 0) {
-        localRemainingSeconds.value[taskId] = task.remainingSeconds
-        startLocalCountdown(taskId, task.remainingSeconds)
+      // 同步后检查任务状态，如果已完成则停止同步
+      const updatedTask = tasks.value.find(t => t.id === taskId)
+      if (!updatedTask || updatedTask.status === 'done') {
+        stopTimerInterval(taskId)
+        if (updatedTask && updatedTask.status === 'done') {
+          whiteNoiseStore.stopNoise()
+          runningTaskId.value = null
+          playCompletionSound()
+        }
+        return
+      }
+      if (updatedTask.timerRunning && updatedTask.remainingSeconds > 0) {
+        localRemainingSeconds.value[taskId] = updatedTask.remainingSeconds
+        startLocalCountdown(taskId, updatedTask.remainingSeconds)
       }
     } catch {
       // ignore sync errors
@@ -353,6 +358,9 @@ const loadTasks = async () => {
         startLocalCountdown(runningTask.id, runningTask.remainingSeconds)
         startTimerInterval(runningTask.id)
       }
+      // 页面刷新后继续播放白噪音
+      console.log('检测到运行中的任务，尝试播放白噪音，selectedNoiseId:', whiteNoiseStore.selectedNoiseId)
+      await whiteNoiseStore.playNoise()
     } else {
       runningTaskId.value = null
     }
@@ -559,6 +567,8 @@ const toggleCheckin = async (task: Task) => {
       if (runningTaskId.value === task.id) {
         runningTaskId.value = null
       }
+      // 停止白噪音
+      whiteNoiseStore.stopNoise()
       await taskApi.checkinTask(task.id)
       message.success('打卡成功')
     }
@@ -570,7 +580,7 @@ const toggleCheckin = async (task: Task) => {
 
 onMounted(async () => {
   await whiteNoiseStore.loadUserSettings()
-  loadTasks()
+  await loadTasks()
 })
 </script>
 
