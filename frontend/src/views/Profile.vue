@@ -31,10 +31,11 @@
 
     <n-card style="margin-top: 20px" title="数据管理">
       <div class="data-actions">
-        <n-button type="primary" size="small" @click="exportMarkdown">导出 Markdown</n-button>
-        <n-button size="small" @click="downloadTemplate">下载模板</n-button>
-        <n-button type="warning" size="small" @click="showImportDialog">导入 Markdown</n-button>
-        <n-button type="error" size="small" @click="clearAllTasks">清空所有任务</n-button>
+        <n-button size="small" type="success" @click="downloadTemplate">下载 MD 模板</n-button>
+        <n-button type="primary" size="small" @click="exportMarkdown">导出 MD</n-button>
+        
+        <n-button type="warning" size="small" @click="showImportDialog">导入 MD</n-button>
+        <n-button type="error" size="small" @click="clearAllTasks">清空任务</n-button>
       </div>
     </n-card>
 
@@ -56,7 +57,7 @@
     </n-card>
 
     <!-- 导入对话框 -->
-    <n-modal v-model:show="importDialogVisible" preset="dialog" title="导入 Markdown">
+    <n-modal v-model:show="importDialogVisible" preset="dialog" title="导入 MD">
       <n-upload accept=".md" :max="1" :show-file-list="true" @change="handleFileChange">
         <n-button size="small">选择 Markdown 文件</n-button>
       </n-upload>

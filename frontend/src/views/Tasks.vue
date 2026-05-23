@@ -10,12 +10,12 @@
         <n-button circle class="nav-btn" @click="nextDay">
           <template #icon><n-icon><ChevronForward /></n-icon></template>
         </n-button>
+        <n-button size="small" class="action-btn today-btn" @click="goToday">今天</n-button>
       </div>
       <div class="top-actions">
-        <n-button size="small" class="action-btn" @click="showUnfinished">未完成任务</n-button>
-        <n-button size="small" class="action-btn" @click="goToday">今天</n-button>
+        <n-button size="small"  type="warning" @click="showUnfinished">未完成任务</n-button>
         <n-button type="primary" size="small" class="create-btn" @click="showCreateDialog">
-          <template #icon><n-icon><Add /></n-icon></template>
+          
           新建任务
         </n-button>
       </div>
@@ -618,6 +618,11 @@ onMounted(async () => {
 .date-picker :deep(.n-input__input) {
   font-weight: 500;
   color: var(--text-primary);
+}
+
+.today-btn {
+  margin-left: 2px;
+  border-radius: 8px !important;
 }
 
 .top-actions {
