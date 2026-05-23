@@ -153,12 +153,42 @@ onMounted(() => {
   max-width: 900px;
   margin: 0 auto;
 }
+
+.progress-page :deep(.n-card) {
+  border-radius: 12px;
+  box-shadow: var(--card-shadow);
+  margin-top: 16px;
+}
+
+.progress-page :deep(.n-card:first-child) {
+  margin-top: 0;
+}
+
+.progress-page :deep(.n-card-header__title) {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
 .chart-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.progress-page :deep(.n-statistic) {
+  color: var(--text-primary);
+}
+
+.progress-page :deep(.n-statistic__label) {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.progress-page :deep(.n-statistic__value) {
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 @media (max-width: 768px) {

@@ -94,13 +94,15 @@ const handleRegister = async () => {
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(160deg, #F0F7F4 0%, #D4EDE4 50%, #B8E0D1 100%);
   padding: 16px;
   box-sizing: border-box;
 }
 .register-card {
   width: 400px;
   max-width: 100%;
+  border-radius: 14px;
+  box-shadow: var(--card-shadow);
 }
 .actions {
   margin-top: 20px;

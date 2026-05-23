@@ -278,10 +278,31 @@ onMounted(async () => {
   max-width: 900px;
   margin: 0 auto;
 }
+
+.profile-page :deep(.n-card) {
+  border-radius: 12px;
+  box-shadow: var(--card-shadow);
+  margin-top: 16px;
+}
+
+.profile-page :deep(.n-card:first-child) {
+  margin-top: 0;
+}
+
+.profile-page :deep(.n-card-header__title) {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
 .data-actions {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
+}
+
+.data-actions :deep(.n-button) {
+  border-radius: 8px !important;
+  transition: all 0.2s ease;
 }
 
 @media (max-width: 768px) {

@@ -1,66 +1,78 @@
 <template>
   <div class="tasks-page">
-    <n-card  style="margin-top: 20px" >
-    <div class="date-nav">
-      <n-button circle @click="prevDay">
-        <template #icon><n-icon><ChevronBack /></n-icon></template>
-      </n-button>
-      <n-date-picker v-model:value="currentDate" type="date" value-format="yyyy-MM-dd" :input-readonly="true" style="width: 120px" @update:value="loadTasks" />
-      <n-button circle @click="nextDay">
-        <template #icon><n-icon><ChevronForward /></n-icon></template>
-      </n-button>
-      <div class="right-actions">
-        <n-button size="small" @click="showUnfinished">未完成任务</n-button>
-        <n-button size="small" @click="goToday">今天</n-button>
-        <n-button type="primary" size="small" @click="showCreateDialog">
+    <!-- 顶部日期导航 -->
+    <div class="top-bar">
+      <div class="date-nav">
+        <n-button circle class="nav-btn" @click="prevDay">
+          <template #icon><n-icon><ChevronBack /></n-icon></template>
+        </n-button>
+        <n-date-picker v-model:value="currentDate" type="date" value-format="yyyy-MM-dd" :input-readonly="true" class="date-picker" @update:value="loadTasks" />
+        <n-button circle class="nav-btn" @click="nextDay">
+          <template #icon><n-icon><ChevronForward /></n-icon></template>
+        </n-button>
+      </div>
+      <div class="top-actions">
+        <n-button size="small" class="action-btn" @click="showUnfinished">未完成任务</n-button>
+        <n-button size="small" class="action-btn" @click="goToday">今天</n-button>
+        <n-button type="primary" size="small" class="create-btn" @click="showCreateDialog">
           <template #icon><n-icon><Add /></n-icon></template>
           新建任务
         </n-button>
       </div>
     </div>
-</n-card>
-    <n-card  style="margin-top: 20px; min-height: 550px">
-      <n-empty v-if="tasks.length === 0" description="暂无任务" />
-      <div v-for="task in tasks" :key="task.id" class="task-item" :style="{ paddingLeft: (task.level - 1) * 24 + 'px' }" :class="{ 'timer-running': task.timerRunning, 'task-locked': task.status === 'done' }">
-        <div class="task-content" style="position: relative;">
-          <n-checkbox
-            :checked="task.status === 'done'"
-            @update:checked="() => toggleCheckin(task)"
-          />
-          <div class="task-info">
-            <span :class="{ 'task-done': task.status === 'done', 'counting-down': task.timerRunning }" class="task-name">{{ task.name }}</span>
+
+    <!-- 任务列表 -->
+    <div class="task-list-card">
+      <n-empty v-if="tasks.length === 0" description="暂无任务" class="empty-state" />
+      <div v-for="task in tasks" :key="task.id" class="task-row" :style="{ paddingLeft: (task.level - 1) * 28 + 8 + 'px' }" :class="{ 'task-timer': task.timerRunning, 'task-done-state': task.status === 'done' }">
+        <div class="task-main">
+          <div class="task-check">
+            <n-checkbox
+              :checked="task.status === 'done'"
+              @update:checked="() => toggleCheckin(task)"
+            />
+          </div>
+          <div class="task-body">
+            <span :class="{ 'task-name-done': task.status === 'done', 'task-name-timer': task.timerRunning }" class="task-name">{{ task.name }}</span>
             <span v-if="task.description" class="task-desc">{{ task.description }}</span>
-            <div class="task-meta">
-              <n-tag v-if="(task.estimatedMinutes > 0 || (task.status === 'done' && task.originalEstimatedMinutes > 0)) && !task.timerRunning && !(localRemainingSeconds[task.id] && task.status !== 'done')" size="small" :type="task.status === 'done' ? 'success' : 'info'">{{ task.status === 'done' ? (task.originalEstimatedMinutes || task.estimatedMinutes) : task.estimatedMinutes }}分钟</n-tag>
-              <span v-if="(task.timerRunning || localRemainingSeconds[task.id]) && task.status !== 'done'" class="timer-display"><n-tag size="small" type="info">⏱ {{ formatTimer(localRemainingSeconds[task.id] ?? task.remainingSeconds) }}</n-tag></span>
+            <div class="task-tags">
+              <span v-if="(task.estimatedMinutes > 0 || (task.status === 'done' && task.originalEstimatedMinutes > 0)) && !task.timerRunning && !(localRemainingSeconds[task.id] && task.status !== 'done')" class="time-tag" :class="{ 'tag-done': task.status === 'done' }">
+                <span class="tag-dot"></span>
+                {{ task.status === 'done' ? (task.originalEstimatedMinutes || task.estimatedMinutes) : task.estimatedMinutes }}分钟
+              </span>
+              <span v-if="(task.timerRunning || localRemainingSeconds[task.id]) && task.status !== 'done'" class="timer-tag">
+                <span class="timer-icon">⏱</span>
+                {{ formatTimer(localRemainingSeconds[task.id] ?? task.remainingSeconds) }}
+              </span>
             </div>
           </div>
         </div>
         <div class="task-actions">
-          <!-- 去完成/暂停按钮 - 仅叶子节点且有预计耗时且未完成时显示 -->
+          <!-- 去完成/暂停按钮 -->
           <n-button v-if="!task.children?.length && task.estimatedMinutes > 0 && task.status !== 'done'" 
             size="small" 
             quaternary circle
+            class="timer-btn"
             :disabled="runningTaskId !== null && runningTaskId !== task.id"
             :type="task.timerRunning ? 'warning' : 'primary'"
             @click="toggleTimer(task)">
             <template #icon><n-icon><component :is="task.timerRunning ? PauseCircleOutline : PlayCircleOutline" /></n-icon></template>
           </n-button>
-          <n-button v-if="task.level < 3 && task.status !== 'done'" size="small" quaternary circle :disabled="task.timerRunning || runningTaskId !== null" @click="showAddChildDialog(task)">
+          <n-button v-if="task.level < 3 && task.status !== 'done'" size="small" quaternary circle class="action-icon-btn" :disabled="task.timerRunning || runningTaskId !== null" @click="showAddChildDialog(task)">
             <template #icon><n-icon><AddCircle /></n-icon></template>
           </n-button>
-          <n-button v-if="task.status !== 'done'" size="small" quaternary circle :disabled="runningTaskId !== null" @click="showEditDialog(task)">
+          <n-button v-if="task.status !== 'done'" size="small" quaternary circle class="action-icon-btn" :disabled="runningTaskId !== null" @click="showEditDialog(task)">
             <template #icon><n-icon><Create /></n-icon></template>
           </n-button>
-          <n-button v-if="task.status !== 'done'" size="small" quaternary circle type="error" :disabled="runningTaskId !== null" @click="deleteTask(task)">
+          <n-button v-if="task.status !== 'done'" size="small" quaternary circle class="action-icon-btn delete-btn" :disabled="runningTaskId !== null" @click="deleteTask(task)">
             <template #icon><n-icon><Trash /></n-icon></template>
           </n-button>
         </div>
       </div>
-    </n-card>
+    </div>
 
     <!-- 创建/编辑对话框 -->
-    <n-modal v-model:show="dialogVisible" preset="dialog" :title="isEdit ? '编辑任务' : '新建任务'">
+    <n-modal v-model:show="dialogVisible" preset="dialog" :title="isEdit ? '编辑任务' : '新建任务'" class="task-dialog">
       <n-form :model="taskForm" label-placement="left" label-width="80" class="dialog-form">
         <n-form-item label="任务名称">
           <n-input v-model:value="taskForm.name" placeholder="请输入任务名称" />
@@ -72,11 +84,11 @@
           <n-select v-model:value="taskForm.parentId" :options="parentSelectOptions" placeholder="选择父任务" />
         </n-form-item>
         <n-form-item label="计划日期">
-          <n-date-picker v-model:value="taskForm.plannedDate" type="date" value-format="yyyy-MM-dd" style="width: 180px" />
+          <n-date-picker v-model:value="taskForm.plannedDate" type="date" value-format="yyyy-MM-dd" class="dialog-date" />
         </n-form-item>
         <n-form-item v-if="!hasChildren" label="预计耗时">
           <n-input-number v-model:value="taskForm.estimatedMinutes" :min="0" />
-          <span style="margin-left: 8px">分钟</span>
+          <span class="unit-text">分钟</span>
         </n-form-item>
         <n-form-item label="描述">
           <n-input v-model:value="taskForm.description" type="textarea" :rows="3" />
@@ -567,118 +579,309 @@ onMounted(async () => {
 .tasks-page {
   max-width: 900px;
   margin: 0 auto;
+  padding: 0 16px 32px;
 }
+
+/* ===== 顶部导航栏 ===== */
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 20px;
+  padding: 16px 20px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: var(--card-shadow);
+}
+
 .date-nav {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
 }
-.date-nav .right-align {
-  margin-left: auto;
+
+.nav-btn {
+  border: 1px solid var(--border-subtle) !important;
+  color: var(--text-secondary) !important;
+  transition: all 0.2s ease;
 }
-.right-actions {
+.nav-btn:hover {
+  background: var(--mint-light) !important;
+  border-color: var(--mint-accent) !important;
+  color: var(--mint-primary) !important;
+}
+
+.date-picker {
+  width: 130px;
+}
+.date-picker :deep(.n-input__input) {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.top-actions {
   display: flex;
+  align-items: center;
   gap: 8px;
-  margin-left: auto;
 }
-.date-nav :deep(.n-date-picker) {
-  flex: none;
-  min-width: 100px;
+
+.action-btn {
+  border: 1px solid var(--border-subtle) !important;
+  color: var(--text-secondary) !important;
+  border-radius: 8px !important;
+  transition: all 0.2s ease;
 }
-.task-item {
+.action-btn:hover {
+  background: var(--mint-light) !important;
+  border-color: var(--mint-accent) !important;
+  color: var(--mint-primary) !important;
+}
+
+.create-btn {
+  background: var(--mint-primary) !important;
+  border: none !important;
+  border-radius: 8px !important;
+  color: #fff !important;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+.create-btn:hover {
+  background: var(--mint-primary-hover) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(45, 106, 93, 0.2);
+}
+
+/* ===== 任务列表卡片 ===== */
+.task-list-card {
+  margin-top: 16px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: var(--card-shadow);
+  padding: 8px 0;
+  min-height: 500px;
+}
+
+.empty-state {
+  padding: 60px 0;
+}
+
+/* ===== 任务行 ===== */
+.task-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 8px;
-  border-bottom: 1px solid #f0f0f0;
+  padding: 14px 16px;
+  margin: 2px 8px;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+  position: relative;
 }
-.task-item:last-child {
-  border-bottom: none;
+.task-row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 60%;
+  border-radius: 2px;
+  background: transparent;
+  transition: background 0.2s ease;
 }
-.task-content {
+.task-row:hover {
+  background: var(--mint-light);
+}
+.task-row:hover .task-actions {
+  opacity: 1;
+}
+
+/* 计时中任务 */
+.task-timer {
+  background: linear-gradient(135deg, rgba(123, 200, 164, 0.08) 0%, rgba(45, 106, 93, 0.05) 100%);
+}
+.task-timer::before {
+  background: var(--mint-primary);
+}
+
+/* 已完成任务 */
+.task-done-state {
+  opacity: 0.55;
+}
+.task-done-state .task-name-done {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+.task-done-state::before {
+  background: var(--text-muted);
+}
+
+.task-main {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
   flex: 1;
   min-width: 0;
-  position: relative;
 }
-.task-info {
+
+.task-check {
+  padding-top: 1px;
+  flex-shrink: 0;
+}
+
+.task-body {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
+
 .task-name {
   font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: 1.5;
+  transition: all 0.2s ease;
 }
+
+.task-name-timer {
+  color: var(--mint-primary);
+  font-weight: 600;
+}
+
 .task-desc {
   font-size: 12px;
-  color: #909399;
+  color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: 1.4;
 }
-.task-meta {
+
+/* ===== 标签 ===== */
+.task-tags {
   display: flex;
-  gap: 6px;
-  margin-top: 4px;
+  gap: 8px;
+  align-items: center;
+  margin-top: 2px;
 }
-.task-done {
-  text-decoration: line-through;
-  color: #909399;
-  opacity: 0.6;
+
+.time-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--mint-light);
+  padding: 2px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
 }
+
+.tag-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--mint-accent);
+}
+
+.tag-done .tag-dot {
+  background: var(--text-muted);
+}
+.tag-done {
+  color: var(--text-muted);
+  background: rgba(160, 176, 169, 0.1);
+}
+
+.timer-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--mint-primary);
+  background: var(--mint-light);
+  padding: 2px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.timer-icon {
+  font-size: 13px;
+}
+
+/* ===== 操作按钮 ===== */
 .task-actions {
   display: flex;
-  gap: 4px;
+  align-items: center;
+  gap: 2px;
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: opacity 0.2s ease;
   flex-shrink: 0;
-  min-width: 90px; /* 保持按钮占位，即使按钮隐藏 */
-}
-.task-item:hover .task-actions {
-  opacity: 1;
-}
-.timer-running {
-  background: linear-gradient(90deg, #fff7e6 0%, #e6f7ff 100%);
-}
-.task-locked {
-  background: #f5f5f5;
-  opacity: 0.85;
-}
-.counting-down {
-  color: #1890ff;
-  font-weight: bold;
+  min-width: 90px;
+  justify-content: flex-end;
 }
 
+.timer-btn {
+  transition: all 0.2s ease;
+}
+.timer-btn:hover {
+  transform: scale(1.1);
+}
 
-.timer-btn.start,
-.timer-btn.pause {
-  position: relative;
-  z-index: 20;
+.action-icon-btn {
+  transition: all 0.2s ease;
+}
+.action-icon-btn:hover {
+  background: var(--mint-light) !important;
+}
+
+.delete-btn:hover {
+  background: rgba(239, 68, 68, 0.1) !important;
+}
+.delete-btn :deep(.n-icon) {
+  color: #EF4444;
+}
+
+/* ===== 对话框 ===== */
+.unit-text {
+  margin-left: 8px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.dialog-date {
+  width: 180px;
 }
 .dialog-form {
   padding: 0 16px;
 }
 
+.task-dialog :deep(.n-dialog) {
+  border-radius: 14px;
+}
+
+/* ===== 响应式 ===== */
 @media (max-width: 768px) {
   .tasks-page {
-    max-width: 100%;
+    padding: 0 8px 24px;
+  }
+  .top-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 12px 16px;
+  }
+  .top-actions {
+    justify-content: flex-end;
   }
   .task-actions {
     opacity: 1;
-  }
-  .date-nav {
-    gap: 6px;
-  }
-  .date-nav :deep(.n-button) {
-    padding: 0 8px;
   }
   .task-name {
     font-size: 13px;

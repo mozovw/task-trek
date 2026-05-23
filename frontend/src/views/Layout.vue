@@ -126,9 +126,14 @@ const handleUserAction = async (key: string) => {
   justify-content: center;
   gap: 8px;
   font-size: 20px;
-  font-weight: bold;
-  color: #2080f0;
-  border-bottom: 1px solid #f0f0f0;
+  font-weight: 700;
+  color: var(--mint-primary);
+  border-bottom: 1px solid var(--border-subtle);
+  letter-spacing: 0.5px;
+  transition: background 0.2s ease;
+}
+.sider-header:hover {
+  background: var(--mint-light);
 }
 .logo-text {
   white-space: nowrap;
@@ -140,7 +145,9 @@ const handleUserAction = async (key: string) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
+  padding: 0 20px;
+  background: #fff;
+  border-bottom: 1px solid var(--border-subtle) !important;
 }
 .header-right {
   display: flex;
@@ -150,14 +157,28 @@ const handleUserAction = async (key: string) => {
 }
 .user-name {
   margin-right: 4px;
+  font-weight: 500;
+  color: var(--text-primary);
 }
 .content {
   padding: 0;
-  background: #f5f7fa;
+  background: var(--mint-bg);
   position: relative;
 }
 :deep(.n-layout-scroll-container) {
-  background: #f5f7fa !important;
+  background: var(--mint-bg) !important;
+}
+:deep(.n-layout-sider) {
+  background: #fff !important;
+  border-right: 1px solid var(--border-subtle) !important;
+}
+:deep(.n-menu .n-menu-item) {
+  border-radius: 8px;
+  margin: 2px 8px;
+}
+:deep(.n-menu .n-menu-item--active) {
+  background: var(--mint-light) !important;
+  color: var(--mint-primary) !important;
 }
 .sidebar-overlay {
   position: absolute;
@@ -165,7 +186,7 @@ const handleUserAction = async (key: string) => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.3);
   z-index: 10;
 }
 
@@ -181,7 +202,7 @@ const handleUserAction = async (key: string) => {
     display: none;
   }
   .content {
-    padding: 12px;
+    padding: 8px;
   }
 }
 </style>
