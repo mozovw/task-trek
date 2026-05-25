@@ -191,6 +191,19 @@ onMounted(() => {
   color: var(--text-primary);
 }
 
+.progress-page :deep(.n-grid) {
+  text-align: center;
+}
+
+.progress-page :deep(.n-gi) {
+  display: flex;
+  justify-content: center;
+}
+
+.progress-page :deep(.n-statistic) {
+  text-align: center;
+}
+
 @media (max-width: 768px) {
   .progress-page {
     max-width: 100%;
