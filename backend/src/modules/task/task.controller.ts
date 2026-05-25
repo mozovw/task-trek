@@ -67,4 +67,9 @@ export class TaskController {
   async syncTimer(@Req() req: any, @Param('id') id: number) {
     return this.taskService.syncTimer(req.user.userId, id);
   }
+
+  @Put(':id/remark')
+  async updateRemark(@Req() req: any, @Param('id') id: number, @Body() body: { remark: string | null }) {
+    return this.taskService.updateRemark(req.user.userId, id, body.remark);
+  }
 }

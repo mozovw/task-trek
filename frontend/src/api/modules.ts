@@ -43,6 +43,8 @@ export const taskApi = {
 
   deleteTask: (id: number, deleteAll = false) =>
     api.delete(`/tasks/${id}?deleteAll=${deleteAll}`),
+  updateRemark: (id: number, remark: string | null) =>
+    api.put<Task>(`/tasks/${id}/remark`, { remark }),
 
   checkinTask: (id: number) =>
     api.post(`/tasks/${id}/checkin`),

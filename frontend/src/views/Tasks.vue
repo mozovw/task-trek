@@ -68,6 +68,9 @@
           <n-button v-if="task.status !== 'done'" size="small" quaternary circle class="action-icon-btn delete-btn" :disabled="runningTaskId !== null" @click="deleteTask(task)">
             <template #icon><n-icon><Trash /></n-icon></template>
           </n-button>
+          <n-button v-if="task.status === 'done' && task.originalEstimatedMinutes > 0" size="small" quaternary circle class="action-icon-btn remark-btn" @click="showRemarkDialog(task)">
+            <template #icon><n-icon><ChatboxEllipses /></n-icon></template>
+          </n-button>
         </div>
       </div>
     </div>
@@ -108,6 +111,13 @@
             class="dialog-date"
           />
         </n-form-item>
+        <n-form-item v-if="isEdit && taskForm.level === 1 && taskForm.repeatEnabled && !repeatDisabled" label="重复频次">
+          <n-space class="weekday-group">
+            <n-checkbox v-for="(label, day) in weekdayLabels" :key="day" :checked="taskForm.repeatDays.includes(Number(day))" @update:checked="(v: boolean) => toggleWeekday(Number(day), v)">
+              {{ label }}
+            </n-checkbox>
+          </n-space>
+        </n-form-item>
       </n-form>
       <template #action>
         <n-space>
@@ -126,6 +136,18 @@
         size="small"
       />
     </n-modal>
+
+    <!-- 任务备注弹窗 -->
+    <n-modal v-model:show="showRemarkModal" preset="dialog" title="任务备注" :style="{ width: '450px' }">
+      <n-input v-model:value="remarkContent" type="textarea" :rows="5" placeholder="请输入备注内容..." />
+      <template #action>
+        <n-space>
+          <n-button @click="showRemarkModal = false">取消</n-button>
+          <n-button :loading="remarkSaving" @click="clearRemark">清除并保存</n-button>
+          <n-button type="primary" :loading="remarkSaving" @click="saveRemark">保存</n-button>
+        </n-space>
+      </template>
+    </n-modal>
   </div>
 </template>
 
@@ -134,7 +156,7 @@ import { ref, reactive, onMounted, computed, h, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMessage, useDialog, type DataTableColumns } from 'naive-ui'
 import { NIcon, NButton } from 'naive-ui'
-import { ChevronBack, ChevronForward, Add, AddCircle, Create, Trash, PlayCircleOutline, PauseCircleOutline } from '@vicons/ionicons5'
+import { ChevronBack, ChevronForward, Add, AddCircle, Create, Trash, ChatboxEllipses, PlayCircleOutline, PauseCircleOutline } from '@vicons/ionicons5'
 import { taskApi, statsApi } from '@/api/modules'
 import { useWhiteNoiseStore } from '@/stores/whiteNoise'
 import type { Task, UnfinishedTask } from '@/types'
@@ -161,6 +183,49 @@ const timerIntervals = new Map<number, number>() // taskId -> intervalId (1s syn
 const showUnfinishedModal = ref(false)
 const unfinishedTasks = ref<UnfinishedTask[]>([])
 
+// 备注功能
+const showRemarkModal = ref(false)
+const remarkContent = ref('')
+const remarkSaving = ref(false)
+const remarkTaskId = ref<number | null>(null)
+
+const showRemarkDialog = (task: Task) => {
+  remarkTaskId.value = task.id
+  remarkContent.value = task.remark || ''
+  showRemarkModal.value = true
+}
+
+const saveRemark = async () => {
+  if (remarkTaskId.value === null) return
+  remarkSaving.value = true
+  try {
+    await taskApi.updateRemark(remarkTaskId.value, remarkContent.value || null)
+    message.success('备注保存成功')
+    showRemarkModal.value = false
+    loadTasks()
+  } catch (e: any) {
+    message.error(e.response?.data?.message || e.message || '保存失败')
+  } finally {
+    remarkSaving.value = false
+  }
+}
+
+const clearRemark = async () => {
+  if (remarkTaskId.value === null) return
+  remarkSaving.value = true
+  try {
+    await taskApi.updateRemark(remarkTaskId.value, null)
+    remarkContent.value = ''
+    message.success('备注已清除')
+    showRemarkModal.value = false
+    loadTasks()
+  } catch (e: any) {
+    message.error(e.response?.data?.message || e.message || '清除失败')
+  } finally {
+    remarkSaving.value = false
+  }
+}
+
 // 本地倒计时状态（用于每秒更新显示）
 const localRemainingSeconds = ref<Record<number, number>>({})
 
@@ -180,7 +245,22 @@ const taskForm = reactive({
   repeatEnabled: false,
   repeatUntilDate: null as number | null,
   repeatSeriesId: null as string | null,
+  repeatDays: [0, 1, 2, 3, 4, 5, 6] as number[],
 })
+
+const weekdayLabels: Record<number, string> = {
+  1: '周一', 2: '周二', 3: '周三', 4: '周四', 5: '周五', 6: '周六', 0: '周日',
+}
+
+const toggleWeekday = (day: number, checked: boolean) => {
+  if (checked) {
+    if (!taskForm.repeatDays.includes(day)) {
+      taskForm.repeatDays.push(day)
+    }
+  } else {
+    taskForm.repeatDays = taskForm.repeatDays.filter(d => d !== day)
+  }
+}
 
 const parentOptions = computed(() => {
   if (taskForm.level === 1) {
@@ -505,6 +585,7 @@ const showCreateDialog = () => {
   taskForm.repeatEnabled = false
   taskForm.repeatUntilDate = null
   taskForm.repeatSeriesId = null
+  taskForm.repeatDays = [0, 1, 2, 3, 4, 5, 6]
   originalRepeatUntilDate.value = null
   dialogVisible.value = true
 }
@@ -521,6 +602,7 @@ const showAddChildDialog = (parent: Task) => {
   taskForm.repeatEnabled = false
   taskForm.repeatUntilDate = null
   taskForm.repeatSeriesId = null
+  taskForm.repeatDays = [0, 1, 2, 3, 4, 5, 6]
   originalRepeatUntilDate.value = null
   dialogVisible.value = true
 }
@@ -538,6 +620,7 @@ const showEditDialog = (task: Task) => {
   taskForm.repeatEnabled = false
   taskForm.repeatUntilDate = task.repeatUntilDate ? new Date(task.repeatUntilDate + 'T00:00:00').getTime() : null
   taskForm.repeatSeriesId = task.repeatSeriesId || null
+  taskForm.repeatDays = task.repeatDays ? [...task.repeatDays] : [0, 1, 2, 3, 4, 5, 6]
   originalRepeatUntilDate.value = task.repeatUntilDate || null
   editingTaskStatus.value = task.status
   dialogVisible.value = true
@@ -570,6 +653,7 @@ const saveTask = async () => {
     if (isEdit.value && !repeatDisabled.value && taskForm.repeatEnabled && taskForm.repeatUntilDate) {
       const d = new Date(taskForm.repeatUntilDate)
       payload.repeatUntilDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      payload.repeatDays = taskForm.repeatDays
     }
     if (isEdit.value && editingId.value) {
       await taskApi.updateTask(editingId.value, payload)
@@ -596,7 +680,7 @@ const deleteTask = (task: Task) => {
   if (task.repeatSeriesId) {
     dialog.warning({
       title: '确认删除',
-      content: `该任务属于重复任务系列。是否删除所有同系列重复任务？`,
+      content: `该任务属于重复任务系列。是否删除所有同系列重复任务？（已完成的任务将不会被删除）`,
       positiveText: '删除全部',
       negativeText: '仅删除此任务',
       onPositiveClick: async () => {
@@ -829,15 +913,26 @@ onMounted(async () => {
 
 .task-main {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
   flex: 1;
   min-width: 0;
 }
 
 .task-check {
-  padding-top: 1px;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.remark-btn {
+  font-size: 14px !important;
+  --n-icon-size: 14px !important;
+  opacity: 0.65;
+  transition: opacity 0.2s;
+}
+.remark-btn:hover {
+  opacity: 1;
 }
 
 .task-body {
@@ -976,6 +1071,11 @@ onMounted(async () => {
   margin-left: 8px;
   max-width: 160px;
   line-height: 1.4;
+}
+
+.weekday-group {
+  flex-wrap: wrap;
+  gap: 8px 16px;
 }
 
 .series-tag {

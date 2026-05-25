@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsInt, Min, Max, IsDateString, Length } from 'class-validator';
+import { IsString, IsOptional, IsInt, Min, Max, IsDateString, Length, IsArray } from 'class-validator';
 
 export class CreateTaskDto {
   @IsString()
@@ -34,6 +34,10 @@ export class CreateTaskDto {
   @IsOptional()
   @IsString()
   repeatSeriesId?: string;
+
+  @IsOptional()
+  @IsArray()
+  repeatDays?: number[];
 }
 
 export class UpdateTaskDto {
@@ -73,4 +77,8 @@ export class UpdateTaskDto {
   @IsOptional()
   @IsString()
   repeatSeriesId?: string;
+
+  @IsOptional()
+  @IsArray()
+  repeatDays?: number[];
 }

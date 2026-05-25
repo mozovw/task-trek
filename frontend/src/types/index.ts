@@ -29,6 +29,9 @@ export interface Task {
   // 重复任务系列
   repeatSeriesId: string | null
   repeatUntilDate: string | null
+  repeatDays: number[] | null
+  // 任务备注
+  remark: string | null
 }
 
 export interface StatsOverview {

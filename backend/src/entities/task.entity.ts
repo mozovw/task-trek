@@ -73,6 +73,14 @@ export class Task {
   @Column({ nullable: true, type: 'text', name: 'repeat_until_date' })
   repeatUntilDate: string | null;
 
+  // 任务备注
+  @Column({ nullable: true, type: 'text' })
+  remark: string | null;
+
+  // 重复频次（0-6 对应周日-周六，JSON数组）
+  @Column({ nullable: true, type: 'simple-json', name: 'repeat_days' })
+  repeatDays: number[] | null;
+
   @OneToMany(() => Task, (task) => task.parent)
   children: Task[];
 

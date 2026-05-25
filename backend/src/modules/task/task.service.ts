@@ -115,8 +115,8 @@ export class TaskService {
 
     // 如果设置了重复截止日期且为一级任务，创建重复任务系列
     if (dto.repeatUntilDate && task.level === 1) {
-      this.logger.log(`Creating repeat series for task ${saved.id}, repeatUntilDate=${dto.repeatUntilDate}`);
-      await this.createRepeatedTasks(userId, saved, dto.repeatUntilDate);
+      this.logger.log(`Creating repeat series for task ${saved.id}, repeatUntilDate=${dto.repeatUntilDate}, repeatDays=${JSON.stringify(dto.repeatDays)}`);
+      await this.createRepeatedTasks(userId, saved, dto.repeatUntilDate, dto.repeatDays || [0, 1, 2, 3, 4, 5, 6]);
     }
 
     return saved;
@@ -133,23 +133,33 @@ export class TaskService {
 
     // 如果有重复系列且要求删除全部
     if (deleteAll && task.repeatSeriesId) {
-      this.logger.log(`Deleting all tasks in repeat series ${task.repeatSeriesId}`);
+      this.logger.log(`Deleting all non-completed tasks in repeat series ${task.repeatSeriesId}`);
       const seriesTasks = await this.taskRepository.find({
         where: { userId, repeatSeriesId: task.repeatSeriesId },
       });
-      const allIds = seriesTasks.map(t => t.id);
-      // 收集所有子任务ID
-      for (const st of seriesTasks) {
+
+      // 只删除未完成的任务，已完成的任务保留
+      const pendingTasks = seriesTasks.filter(t => t.status !== 'done');
+
+      if (pendingTasks.length === 0) {
+        this.logger.log(`All tasks in series ${task.repeatSeriesId} are completed, nothing to delete`);
+        return;
+      }
+
+      const allIds = pendingTasks.map(t => t.id);
+      // 收集所有未完成任务的后代ID
+      for (const st of pendingTasks) {
         const descendantIds = await this.getDescendantIds(st.id);
         allIds.push(...descendantIds);
       }
       // 删除打卡记录
       await this.checkinRepository.delete(allIds);
-      // 删除所有系列任务
-      for (const st of seriesTasks) {
+      // 删除未完成的系列任务
+      for (const st of pendingTasks) {
         await this.taskRepository.delete(st.id);
       }
-      this.logger.log(`Deleted ${seriesTasks.length} tasks in series ${task.repeatSeriesId}`);
+      const skipped = seriesTasks.length - pendingTasks.length;
+      this.logger.log(`Deleted ${pendingTasks.length} tasks in series ${task.repeatSeriesId}${skipped > 0 ? ` (${skipped} completed tasks skipped)` : ''}`);
       return;
     }
 
@@ -322,6 +332,19 @@ export class TaskService {
     return task;
   }
 
+  // ===== 备注功能 =====
+
+  async updateRemark(userId: number, id: number, remark: string | null): Promise<Task> {
+    const task = await this.taskRepository.findOne({ where: { id, userId } });
+    if (!task) {
+      throw new NotFoundException('任务不存在');
+    }
+    task.remark = remark;
+    const saved = await this.taskRepository.save(task);
+    this.logger.log(`Remark updated for task ${id}: "${remark?.substring(0, 50)}"`);
+    return saved;
+  }
+
   private async cascadeCheckin(userId: number, parentId: number, completedAt: Date): Promise<void> {
     const children = await this.taskRepository.find({ where: { parentId, userId } });
     for (const child of children) {
@@ -491,14 +514,14 @@ export class TaskService {
     return this.taskRepository.findOne({ where: { id, userId } }) as Promise<Task>;
   }
 
-  private async createRepeatedTasks(userId: number, task: Task, repeatUntilDate: string): Promise<void> {
+  private async createRepeatedTasks(userId: number, task: Task, repeatUntilDate: string, repeatDays: number[] = [0, 1, 2, 3, 4, 5, 6]): Promise<void> {
     if (repeatUntilDate <= task.plannedDate) {
       this.logger.warn(`repeatUntilDate ${repeatUntilDate} is not after plannedDate ${task.plannedDate}`);
       return;
     }
 
     const repeatSeriesId = crypto.randomUUID();
-    this.logger.log(`Creating repeat series ${repeatSeriesId} for task ${task.id} (${task.plannedDate} ~ ${repeatUntilDate})`);
+    this.logger.log(`Creating repeat series ${repeatSeriesId} for task ${task.id} (${task.plannedDate} ~ ${repeatUntilDate}), days=[${repeatDays}]`);
 
     const allDescendants = await this.getAllDescendants(task.id);
 
@@ -507,14 +530,20 @@ export class TaskService {
     const end = new Date(repeatUntilDate + 'T00:00:00');
     d.setDate(d.getDate() + 1);
     while (d <= end) {
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      dates.push(`${year}-${month}-${day}`);
+      // 仅生成勾选的星期几
+      if (repeatDays.includes(d.getDay())) {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        dates.push(`${year}-${month}-${day}`);
+      }
       d.setDate(d.getDate() + 1);
     }
 
-    if (dates.length === 0) return;
+    if (dates.length === 0) {
+      this.logger.warn(`No matching dates for repeatDays=[${repeatDays}]`);
+      return;
+    }
 
     const BATCH_SIZE = 50;
     this.logger.log(`Creating ${dates.length} copies in batches of ${BATCH_SIZE}`);
@@ -527,17 +556,18 @@ export class TaskService {
       await queryRunner.manager.update(Task, task.id, {
         repeatSeriesId,
         repeatUntilDate,
+        repeatDays,
       });
 
       for (let i = 0; i < dates.length; i += BATCH_SIZE) {
         const batchDates = dates.slice(i, i + BATCH_SIZE);
         for (const dateStr of batchDates) {
           const newParent = await this.createTaskCopy(
-            queryRunner.manager, userId, task, dateStr, repeatSeriesId, repeatUntilDate, null,
+            queryRunner.manager, userId, task, dateStr, repeatSeriesId, repeatUntilDate, null, repeatDays,
           );
           if (allDescendants.length > 0) {
             await this.createDescendantCopies(
-              queryRunner.manager, userId, allDescendants, newParent.id, dateStr, repeatSeriesId, repeatUntilDate,
+              queryRunner.manager, userId, allDescendants, newParent.id, dateStr, repeatSeriesId, repeatUntilDate, repeatDays,
             );
           }
         }
@@ -568,6 +598,7 @@ export class TaskService {
   private async createTaskCopy(
     manager: any, userId: number, source: Task, dateStr: string,
     seriesId: string, untilDate: string, parentId: number | null,
+    repeatDays: number[] = [0, 1, 2, 3, 4, 5, 6],
   ): Promise<Task> {
     const copy = new Task();
     copy.userId = userId;
@@ -581,6 +612,7 @@ export class TaskService {
     copy.status = 'pending';
     copy.repeatSeriesId = seriesId;
     copy.repeatUntilDate = untilDate;
+    copy.repeatDays = repeatDays;
     copy.parentId = parentId;
     copy.remainingSeconds = 0;
     copy.timerRunning = false;
@@ -599,13 +631,14 @@ export class TaskService {
   private async createDescendantCopies(
     manager: any, userId: number, descendants: Task[],
     newParentId: number, dateStr: string, seriesId: string, untilDate: string,
+    repeatDays: number[] = [0, 1, 2, 3, 4, 5, 6],
   ): Promise<void> {
     const sorted = [...descendants].sort((a, b) => a.level - b.level);
     const idMap = new Map<number, number>();
 
     for (const desc of sorted) {
       const newParent = idMap.get(desc.parentId!) || newParentId;
-      const copy = await this.createTaskCopy(manager, userId, desc, dateStr, seriesId, untilDate, newParent);
+      const copy = await this.createTaskCopy(manager, userId, desc, dateStr, seriesId, untilDate, newParent, repeatDays);
       idMap.set(desc.id, copy.id);
     }
   }
