@@ -57,14 +57,34 @@
     </n-card>
 
     <!-- 导入对话框 -->
-    <n-modal v-model:show="importDialogVisible" preset="dialog" title="导入 MD">
-      <n-upload accept=".md" :max="1" :show-file-list="true" @change="handleFileChange">
-        <n-button size="small">选择 Markdown 文件</n-button>
-      </n-upload>
+    <n-modal v-model:show="importDialogVisible" preset="dialog" title="导入 MD" :style="{ width: '600px' }">
+      <div class="import-dialog">
+        <n-tabs v-model:value="importMode" type="segment" @update:value="handleImportModeChange">
+          <n-tab-pane name="file" tab="文件上传">
+            <n-upload 
+              accept=".md" 
+              :max="1" 
+              :show-file-list="true" 
+              @change="handleFileChange"
+            >
+              <n-button size="small">选择 Markdown 文件</n-button>
+            </n-upload>
+          </n-tab-pane>
+          <n-tab-pane name="text" tab="粘贴内容">
+            <n-input
+              v-model:value="textContent"
+              type="textarea"
+              placeholder="请粘贴或输入 Markdown 内容..."
+              :rows="10"
+              :autosize="{ minRows: 10, maxRows: 20 }"
+            />
+          </n-tab-pane>
+        </n-tabs>
+      </div>
       <template #action>
         <n-space>
           <n-button size="small" @click="importDialogVisible = false">取消</n-button>
-          <n-button size="small" type="primary" :disabled="!fileContent" @click="importMarkdown">导入</n-button>
+          <n-button size="small" type="primary" :disabled="!canImport" @click="importMarkdown">导入</n-button>
         </n-space>
       </template>
     </n-modal>
@@ -72,7 +92,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useMessage, useDialog } from 'naive-ui'
 import type { FormInst } from 'naive-ui'
 import { userApi, authApi, exportApi } from '@/api/modules'
@@ -87,10 +107,29 @@ const whiteNoiseStore = useWhiteNoiseStore()
 const passwordFormRef = ref<FormInst | null>(null)
 const importDialogVisible = ref(false)
 const fileContent = ref('')
+const textContent = ref('')
+const importMode = ref<'file' | 'text'>('file')
 
 // 白噪音相关
 const selectedNoiseId = ref<string | null>(null)
 const previewTimer = ref<number | null>(null)
+
+// 计算是否可以导入
+const canImport = computed(() => {
+  if (importMode.value === 'file') {
+    return !!fileContent.value
+  }
+  return !!textContent.value
+})
+
+// 切换导入模式时清空另一个模式的内容
+const handleImportModeChange = (mode: 'file' | 'text') => {
+  if (mode === 'file') {
+    textContent.value = ''
+  } else {
+    fileContent.value = ''
+  }
+}
 
 const handleFileChange = ({ file }: any) => {
   const rawFile = file.file
@@ -196,16 +235,19 @@ const downloadTemplate = async () => {
 
 const showImportDialog = () => {
   fileContent.value = ''
+  textContent.value = ''
+  importMode.value = 'file'
   importDialogVisible.value = true
 }
 
 const importMarkdown = async () => {
-  if (!fileContent.value) {
-    message.warning('请选择文件')
+  const content = importMode.value === 'file' ? fileContent.value : textContent.value
+  if (!content) {
+    message.warning(importMode.value === 'file' ? '请选择文件' : '请输入内容')
     return
   }
   try {
-    const { data } = await exportApi.importMarkdown(fileContent.value)
+    const { data } = await exportApi.importMarkdown(content)
     message.success(`导入成功：${data.success} 条，更新：${data.updated} 条`)
     importDialogVisible.value = false
   } catch {
@@ -304,6 +346,27 @@ onMounted(async () => {
 .data-actions :deep(.n-button) {
   border-radius: 8px !important;
   transition: all 0.2s ease;
+}
+
+.import-dialog {
+  padding: 8px 0;
+}
+
+.import-dialog :deep(.n-tabs) {
+  margin-top: 8px;
+}
+
+.import-dialog :deep(.n-tabs-pane-wrapper) {
+  padding: 12px 0;
+}
+
+.import-dialog :deep(.n-upload) {
+  width: 100%;
+}
+
+.import-dialog :deep(.n-input__textarea) {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 13px;
 }
 
 @media (max-width: 768px) {
