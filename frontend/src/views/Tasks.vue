@@ -36,7 +36,7 @@
             <span :class="{ 'task-name-done': task.status === 'done', 'task-name-timer': task.timerRunning }" class="task-name">{{ task.name }}</span>
             <span v-if="task.description" class="task-desc" :title="task.description">{{ task.description }}</span>
             <div class="task-tags">
-              <span v-if="task.repeatSeriesId" class="series-tag">重复</span>
+              <span v-if="task.repeatSeriesId" class="series-tag">♻</span>
               <span v-if="(task.estimatedMinutes > 0 || (task.status === 'done' && task.originalEstimatedMinutes > 0)) && !task.timerRunning && !(localRemainingSeconds[task.id] && task.status !== 'done')" class="time-tag" :class="{ 'tag-done': task.status === 'done' }">
                 <span class="tag-dot"></span>
                 {{ task.status === 'done' ? (task.originalEstimatedMinutes || task.estimatedMinutes) : task.estimatedMinutes }}分钟
@@ -969,8 +969,9 @@ onMounted(async () => {
   display: inline-flex;
   align-items: center;
   font-size: 11px;
-  color: #fff;
-  background: var(--mint-primary);
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--mint-light);
   border-radius: 20px;
   padding: 1px 8px;
   line-height: 1.6;
