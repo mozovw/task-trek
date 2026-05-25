@@ -857,14 +857,22 @@ onMounted(async () => {
 /* ===== 对话框 ===== */
 .unit-text {
   margin-left: 8px;
+  width: 15%;
   color: var(--text-secondary);
   font-size: 13px;
 }
 .dialog-date {
-  width: 180px;
+  width: 100%;
 }
 .dialog-form {
   padding: 0 16px;
+}
+
+.dialog-form :deep(.n-input),
+.dialog-form :deep(.n-select),
+.dialog-form :deep(.n-date-picker),
+.dialog-form :deep(.n-input-number) {
+  width: 100%;
 }
 
 .task-dialog :deep(.n-dialog) {
