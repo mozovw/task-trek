@@ -26,6 +26,9 @@ export interface Task {
   timerStartedAt: string | null
   // 原始预计耗时（用于任务完成时恢复）
   originalEstimatedMinutes: number
+  // 重复任务系列
+  repeatSeriesId: string | null
+  repeatUntilDate: string | null
 }
 
 export interface StatsOverview {

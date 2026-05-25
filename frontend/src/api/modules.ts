@@ -41,8 +41,8 @@ export const taskApi = {
   updateTask: (id: number, data: Partial<Task>) =>
     api.put<Task>(`/tasks/${id}`, data),
 
-  deleteTask: (id: number) =>
-    api.delete(`/tasks/${id}`),
+  deleteTask: (id: number, deleteAll = false) =>
+    api.delete(`/tasks/${id}?deleteAll=${deleteAll}`),
 
   checkinTask: (id: number) =>
     api.post(`/tasks/${id}/checkin`),

@@ -26,6 +26,14 @@ export class CreateTaskDto {
   @IsOptional()
   @IsInt()
   parentId?: number;
+
+  @IsOptional()
+  @IsDateString()
+  repeatUntilDate?: string;
+
+  @IsOptional()
+  @IsString()
+  repeatSeriesId?: string;
 }
 
 export class UpdateTaskDto {
@@ -57,4 +65,12 @@ export class UpdateTaskDto {
   @IsOptional()
   @IsInt()
   parentId?: number;
+
+  @IsOptional()
+  @IsDateString()
+  repeatUntilDate?: string;
+
+  @IsOptional()
+  @IsString()
+  repeatSeriesId?: string;
 }

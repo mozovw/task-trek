@@ -1,5 +1,5 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, OneToMany, JoinColumn,
+  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, OneToMany, JoinColumn, Index,
 } from 'typeorm';
 import { User } from './user.entity';
 import { Checkin } from './checkin.entity';
@@ -63,6 +63,15 @@ export class Task {
   // 原始预计耗时（用于任务完成时恢复）
   @Column({ default: 0, type: 'integer', name: 'original_estimated_minutes' })
   originalEstimatedMinutes: number;
+
+  // 重复任务系列标识
+  @Index('idx_tasks_repeat_series')
+  @Column({ nullable: true, type: 'text', name: 'repeat_series_id' })
+  repeatSeriesId: string | null;
+
+  // 重复截止日期
+  @Column({ nullable: true, type: 'text', name: 'repeat_until_date' })
+  repeatUntilDate: string | null;
 
   @OneToMany(() => Task, (task) => task.parent)
   children: Task[];

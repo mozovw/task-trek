@@ -36,6 +36,7 @@
             <span :class="{ 'task-name-done': task.status === 'done', 'task-name-timer': task.timerRunning }" class="task-name">{{ task.name }}</span>
             <span v-if="task.description" class="task-desc" :title="task.description">{{ task.description }}</span>
             <div class="task-tags">
+              <span v-if="task.repeatSeriesId" class="series-tag">重复</span>
               <span v-if="(task.estimatedMinutes > 0 || (task.status === 'done' && task.originalEstimatedMinutes > 0)) && !task.timerRunning && !(localRemainingSeconds[task.id] && task.status !== 'done')" class="time-tag" :class="{ 'tag-done': task.status === 'done' }">
                 <span class="tag-dot"></span>
                 {{ task.status === 'done' ? (task.originalEstimatedMinutes || task.estimatedMinutes) : task.estimatedMinutes }}分钟
@@ -93,6 +94,20 @@
         <n-form-item label="描述">
           <n-input v-model:value="taskForm.description" type="textarea" :rows="3" />
         </n-form-item>
+        <n-form-item v-if="isEdit && taskForm.level === 1" label="重复任务">
+          <n-switch v-model:value="taskForm.repeatEnabled" :disabled="repeatDisabled" />
+          <n-text v-if="repeatDisabled" depth="3" class="repeat-hint">
+            {{ repeatHintText }}
+          </n-text>
+        </n-form-item>
+        <n-form-item v-if="isEdit && taskForm.level === 1 && taskForm.repeatEnabled && !repeatDisabled" label="重复到">
+          <n-date-picker
+            v-model:value="taskForm.repeatUntilDate"
+            type="date"
+            :is-date-disabled="isDateBeforePlanned"
+            class="dialog-date"
+          />
+        </n-form-item>
       </n-form>
       <template #action>
         <n-space>
@@ -137,6 +152,7 @@ const dialogVisible = ref(false)
 const isEdit = ref(false)
 const editingId = ref<number | null>(null)
 const editingHasChildren = ref(false)
+const originalRepeatUntilDate = ref<string | null>(null)
 const allTasks = ref<Task[]>([])
 
 const timerIntervals = new Map<number, number>() // taskId -> intervalId (1s sync + countdown)
@@ -160,6 +176,9 @@ const taskForm = reactive({
   estimatedMinutes: 0,
   description: '',
   parentId: undefined as number | undefined,
+  repeatEnabled: false,
+  repeatUntilDate: null as number | null,
+  repeatSeriesId: null as string | null,
 })
 
 const parentOptions = computed(() => {
@@ -190,6 +209,28 @@ const hasChildren = computed(() => {
   if (!isEdit.value) return false
   return editingHasChildren.value
 })
+
+// 重复任务编辑权限：母任务和中间重复任务置灰，仅最后一天可配
+// 使用 originalRepeatUntilDate（原始值）而非 taskForm.repeatUntilDate（绑定到 date-picker，选择新值会变化）
+const repeatDisabled = computed(() => {
+  if (!isEdit.value) return false
+  if (!taskForm.repeatSeriesId || !originalRepeatUntilDate.value) return false
+  return taskForm.plannedDate !== originalRepeatUntilDate.value
+})
+
+const repeatHintText = computed(() => {
+  if (!taskForm.repeatSeriesId) return ''
+  if (repeatDisabled.value) {
+    return '此任务已属于重复序列，不可修改重复设置'
+  }
+  return '此任务为序列最后一天，可配置新的重复序列'
+})
+
+// 重复任务日期禁用：不允许选择计划日期及之前的日期
+const isDateBeforePlanned = (ts: number) => {
+  const plannedTs = new Date(taskForm.plannedDate + 'T00:00:00').getTime()
+  return ts <= plannedTs
+}
 
 // 格式化计时器显示（秒 -> MM:SS）
 const formatTimer = (seconds: number): string => {
@@ -449,6 +490,10 @@ const showCreateDialog = () => {
   taskForm.estimatedMinutes = 0
   taskForm.description = ''
   taskForm.parentId = undefined
+  taskForm.repeatEnabled = false
+  taskForm.repeatUntilDate = null
+  taskForm.repeatSeriesId = null
+  originalRepeatUntilDate.value = null
   dialogVisible.value = true
 }
 
@@ -461,6 +506,10 @@ const showAddChildDialog = (parent: Task) => {
   taskForm.estimatedMinutes = 0
   taskForm.description = ''
   taskForm.parentId = parent.id
+  taskForm.repeatEnabled = false
+  taskForm.repeatUntilDate = null
+  taskForm.repeatSeriesId = null
+  originalRepeatUntilDate.value = null
   dialogVisible.value = true
 }
 
@@ -474,6 +523,10 @@ const showEditDialog = (task: Task) => {
   taskForm.estimatedMinutes = task.estimatedMinutes
   taskForm.description = task.description || ''
   taskForm.parentId = task.parentId || undefined
+  taskForm.repeatEnabled = false
+  taskForm.repeatUntilDate = task.repeatUntilDate ? new Date(task.repeatUntilDate + 'T00:00:00').getTime() : null
+  taskForm.repeatSeriesId = task.repeatSeriesId || null
+  originalRepeatUntilDate.value = task.repeatUntilDate || null
   dialogVisible.value = true
 }
 
@@ -501,6 +554,10 @@ const saveTask = async () => {
     if (taskForm.parentId) {
       payload.parentId = taskForm.parentId
     }
+    if (isEdit.value && !repeatDisabled.value && taskForm.repeatEnabled && taskForm.repeatUntilDate) {
+      const d = new Date(taskForm.repeatUntilDate)
+      payload.repeatUntilDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    }
     if (isEdit.value && editingId.value) {
       await taskApi.updateTask(editingId.value, payload)
       // 编辑保存后清除本地倒计时状态
@@ -523,27 +580,63 @@ const saveTask = async () => {
 }
 
 const deleteTask = (task: Task) => {
-  dialog.warning({
-    title: '确认删除',
-    content: `确定删除"${task.name}"及其所有子任务吗？`,
-    positiveText: '删除',
-    negativeText: '取消',
-    onPositiveClick: async () => {
-      try {
-        // 如果删除的是运行中的任务，清除运行状态
-        if (runningTaskId.value === task.id) {
-          stopAllIntervals(task.id)
-          delete localRemainingSeconds.value[task.id]
-          runningTaskId.value = null
+  if (task.repeatSeriesId) {
+    dialog.warning({
+      title: '确认删除',
+      content: `该任务属于重复任务系列。是否删除所有同系列重复任务？`,
+      positiveText: '删除全部',
+      negativeText: '仅删除此任务',
+      onPositiveClick: async () => {
+        try {
+          if (runningTaskId.value === task.id) {
+            stopAllIntervals(task.id)
+            delete localRemainingSeconds.value[task.id]
+            runningTaskId.value = null
+          }
+          await taskApi.deleteTask(task.id, true)
+          message.success('已删除全部重复任务')
+          loadTasks()
+        } catch (e: any) {
+          message.error(e.message || '删除失败')
         }
-        await taskApi.deleteTask(task.id)
-        message.success('删除成功')
-        loadTasks()
-      } catch (e: any) {
-        message.error(e.message || '删除失败')
-      }
-    },
-  })
+      },
+      onNegativeClick: async () => {
+        try {
+          if (runningTaskId.value === task.id) {
+            stopAllIntervals(task.id)
+            delete localRemainingSeconds.value[task.id]
+            runningTaskId.value = null
+          }
+          await taskApi.deleteTask(task.id, false)
+          message.success('删除成功')
+          loadTasks()
+        } catch (e: any) {
+          message.error(e.message || '删除失败')
+        }
+      },
+    })
+  } else {
+    dialog.warning({
+      title: '确认删除',
+      content: `确定删除"${task.name}"及其所有子任务吗？`,
+      positiveText: '删除',
+      negativeText: '取消',
+      onPositiveClick: async () => {
+        try {
+          if (runningTaskId.value === task.id) {
+            stopAllIntervals(task.id)
+            delete localRemainingSeconds.value[task.id]
+            runningTaskId.value = null
+          }
+          await taskApi.deleteTask(task.id)
+          message.success('删除成功')
+          loadTasks()
+        } catch (e: any) {
+          message.error(e.message || '删除失败')
+        }
+      },
+    })
+  }
 }
 
 const toggleCheckin = async (task: Task) => {
@@ -864,6 +957,25 @@ onMounted(async () => {
 .dialog-date {
   width: 100%;
 }
+
+.repeat-hint {
+  font-size: 12px;
+  margin-left: 8px;
+  max-width: 160px;
+  line-height: 1.4;
+}
+
+.series-tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  color: #fff;
+  background: var(--mint-primary);
+  border-radius: 20px;
+  padding: 1px 8px;
+  line-height: 1.6;
+}
+
 .dialog-form {
   padding: 0 16px;
 }

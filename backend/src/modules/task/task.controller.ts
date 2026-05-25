@@ -25,12 +25,21 @@ export class TaskController {
 
   @Put(':id')
   async updateTask(@Req() req: any, @Param('id') id: number, @Body() dto: UpdateTaskDto) {
+    // 如果有 repeatUntilDate，直接走 updateTask（内部会调用 createRepeatedTasks 创建新重复系列）
+    // 否则检查是否为重复系列任务，走 updateRepeatSeries 同步更新
+    if (!dto.repeatUntilDate) {
+      const task = await this.taskService['taskRepository'].findOne({ where: { id, userId: req.user.userId } });
+      if (task?.repeatSeriesId) {
+        return this.taskService.updateRepeatSeries(req.user.userId, id, dto);
+      }
+    }
     return this.taskService.updateTask(req.user.userId, id, dto);
   }
 
   @Delete(':id')
-  async deleteTask(@Req() req: any, @Param('id') id: number) {
-    await this.taskService.deleteTask(req.user.userId, id);
+  async deleteTask(@Req() req: any, @Param('id') id: number, @Query('deleteAll') deleteAll?: string) {
+    const deleteAllBool = deleteAll === 'true';
+    await this.taskService.deleteTask(req.user.userId, id, deleteAllBool);
     return { message: '删除成功' };
   }
 
