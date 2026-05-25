@@ -429,6 +429,22 @@ export class TaskService {
     if (!task) throw new NotFoundException('任务不存在');
     if (!task.repeatSeriesId) throw new BadRequestException('任务不属于重复系列');
 
+    // 重复系列任务不可修改计划日期
+    if (dto.plannedDate !== undefined && dto.plannedDate !== task.plannedDate) {
+      throw new BadRequestException('重复系列任务不可修改计划日期');
+    }
+
+    // 重复系列任务已完成或有子任务时不可修改预计耗时
+    if (dto.estimatedMinutes !== undefined) {
+      if (task.status === 'done') {
+        throw new BadRequestException('已完成的任务不可修改预计耗时');
+      }
+      const childCount = await this.taskRepository.count({ where: { parentId: task.id } });
+      if (childCount > 0) {
+        throw new BadRequestException('含有子任务的任务不可修改预计耗时');
+      }
+    }
+
     // 只同步非日期、非状态属性
     const syncFields: (keyof UpdateTaskDto)[] = ['name', 'description', 'estimatedMinutes', 'level'];
     const hasSyncableField = syncFields.some(f => dto[f] !== undefined);
@@ -454,9 +470,13 @@ export class TaskService {
         changed = true;
       }
       if (dto.estimatedMinutes !== undefined && st.estimatedMinutes !== dto.estimatedMinutes) {
-        st.estimatedMinutes = dto.estimatedMinutes;
-        st.originalEstimatedMinutes = dto.estimatedMinutes;
-        changed = true;
+        // 有子任务的任务不同步预计耗时
+        const childCount = await this.taskRepository.count({ where: { parentId: st.id } });
+        if (childCount === 0) {
+          st.estimatedMinutes = dto.estimatedMinutes;
+          st.originalEstimatedMinutes = dto.estimatedMinutes;
+          changed = true;
+        }
       }
       if (dto.level !== undefined && st.level !== dto.level) {
         st.level = dto.level;

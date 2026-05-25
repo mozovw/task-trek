@@ -85,10 +85,10 @@
           <n-select v-model:value="taskForm.parentId" :options="parentSelectOptions" placeholder="选择父任务" />
         </n-form-item>
         <n-form-item label="计划日期">
-          <n-date-picker v-model:value="taskForm.plannedDate" type="date" value-format="yyyy-MM-dd" class="dialog-date" />
+          <n-date-picker v-model:value="taskForm.plannedDate" type="date" value-format="yyyy-MM-dd" class="dialog-date" :disabled="isRepeatSeriesTask" />
         </n-form-item>
-        <n-form-item v-if="!hasChildren" label="预计耗时">
-          <n-input-number v-model:value="taskForm.estimatedMinutes" :min="0" />
+        <n-form-item label="预计耗时">
+          <n-input-number v-model:value="taskForm.estimatedMinutes" :min="0" :disabled="estimatedMinutesDisabled" />
           <span class="unit-text">分钟</span>
         </n-form-item>
         <n-form-item label="描述">
@@ -153,6 +153,7 @@ const isEdit = ref(false)
 const editingId = ref<number | null>(null)
 const editingHasChildren = ref(false)
 const originalRepeatUntilDate = ref<string | null>(null)
+const editingTaskStatus = ref<string>('pending')
 const allTasks = ref<Task[]>([])
 
 const timerIntervals = new Map<number, number>() // taskId -> intervalId (1s sync + countdown)
@@ -216,6 +217,17 @@ const repeatDisabled = computed(() => {
   if (!isEdit.value) return false
   if (!taskForm.repeatSeriesId || !originalRepeatUntilDate.value) return false
   return taskForm.plannedDate !== originalRepeatUntilDate.value
+  })
+
+// 重复系列任务限制：不可修改计划日期
+const isRepeatSeriesTask = computed(() => {
+  return isEdit.value && !!taskForm.repeatSeriesId
+})
+
+// 重复系列任务的预计耗时：已完成或有子任务时禁用
+const estimatedMinutesDisabled = computed(() => {
+  if (isRepeatSeriesTask.value && editingTaskStatus.value === 'done') return true
+  return hasChildren.value
 })
 
 const repeatHintText = computed(() => {
@@ -403,8 +415,8 @@ const loadTasks = async () => {
         localRemainingSeconds.value[t.id] = t.remainingSeconds
       }
     })
-  } catch {
-    // handled
+  } catch (e: any) {
+    message.error(e.response?.data?.message || e.message || '保存失败')
   }
 }
 
@@ -527,6 +539,7 @@ const showEditDialog = (task: Task) => {
   taskForm.repeatUntilDate = task.repeatUntilDate ? new Date(task.repeatUntilDate + 'T00:00:00').getTime() : null
   taskForm.repeatSeriesId = task.repeatSeriesId || null
   originalRepeatUntilDate.value = task.repeatUntilDate || null
+  editingTaskStatus.value = task.status
   dialogVisible.value = true
 }
 
