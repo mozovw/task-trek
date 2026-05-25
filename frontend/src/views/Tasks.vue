@@ -34,7 +34,7 @@
           </div>
           <div class="task-body">
             <span :class="{ 'task-name-done': task.status === 'done', 'task-name-timer': task.timerRunning }" class="task-name">{{ task.name }}</span>
-            <span v-if="task.description" class="task-desc">{{ task.description }}</span>
+            <span v-if="task.description" class="task-desc" :title="task.description">{{ task.description }}</span>
             <div class="task-tags">
               <span v-if="(task.estimatedMinutes > 0 || (task.status === 'done' && task.originalEstimatedMinutes > 0)) && !task.timerRunning && !(localRemainingSeconds[task.id] && task.status !== 'done')" class="time-tag" :class="{ 'tag-done': task.status === 'done' }">
                 <span class="tag-dot"></span>
