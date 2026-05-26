@@ -59,16 +59,16 @@
             @click="toggleTimer(task)">
             <template #icon><n-icon><component :is="task.timerRunning ? PauseCircleOutline : PlayCircleOutline" /></n-icon></template>
           </n-button>
-          <n-button v-if="task.level < 3 && task.status !== 'done'" size="small" quaternary circle class="action-icon-btn" :disabled="task.timerRunning || runningTaskId !== null" @click="showAddChildDialog(task)">
+          <n-button v-if="task.level < 3 && task.status !== 'done'" size="small" quaternary circle type="warning" class="action-icon-btn" :disabled="task.timerRunning || runningTaskId !== null" @click="showAddChildDialog(task)">
             <template #icon><n-icon><AddCircle /></n-icon></template>
           </n-button>
-          <n-button v-if="task.status !== 'done'" size="small" quaternary circle class="action-icon-btn" :disabled="runningTaskId !== null" @click="showEditDialog(task)">
+          <n-button v-if="task.status !== 'done'" size="small" quaternary circle type="warning" class="action-icon-btn" :disabled="runningTaskId !== null" @click="showEditDialog(task)">
             <template #icon><n-icon><Create /></n-icon></template>
           </n-button>
-          <n-button v-if="task.status !== 'done'" size="small" quaternary circle class="action-icon-btn delete-btn" :disabled="runningTaskId !== null" @click="deleteTask(task)">
+          <n-button v-if="task.status !== 'done'" size="small" quaternary circle type="warning" class="action-icon-btn delete-btn" :disabled="runningTaskId !== null" @click="deleteTask(task)">
             <template #icon><n-icon><Trash /></n-icon></template>
           </n-button>
-          <n-button v-if="task.status === 'done' && task.originalEstimatedMinutes > 0" size="small" quaternary circle class="action-icon-btn remark-btn" @click="showRemarkDialog(task)">
+          <n-button v-if="task.status === 'done' && task.originalEstimatedMinutes > 0" size="small" quaternary circle type="warning" class="action-icon-btn remark-btn" @click="showRemarkDialog(task)">
             <template #icon><n-icon><ChatboxEllipses /></n-icon></template>
           </n-button>
         </div>
