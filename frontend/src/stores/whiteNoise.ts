@@ -18,6 +18,8 @@ export const whiteNoiseOptions: WhiteNoiseOption[] = [
   { id: 'chill', name: '轻松', url: 'https://www.ppbzy.com/audio/Lofi/Chill/Lofi%20chill%201.m4a' },
   { id: 'sleep', name: '助眠', url: 'https://www.ppbzy.com/audio/Lofi/Sleep/Lofi%20sleep%201.m4a' },
   { id: 'piano', name: '钢琴', url: 'https://www.ppbzy.com/audio/Lofi/Piano/Lofi%20piano%201.m4a' },
+  { id: 'river', name: '河流', url: 'https://white-noises.com/sounds/nature/river.mp3' },
+  { id: 'clock', name: '时钟', url: 'https://white-noises.com/sounds/things/clock.mp3' },
 ]
 
 export const useWhiteNoiseStore = defineStore('whiteNoise', () => {
