@@ -91,8 +91,8 @@ export class StatsService {
 
   async getCalendarData(userId: number, year: number, month: number) {
     const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-    const endDate = new Date(year, month, 0);
-    const endDateStr = endDate.toISOString().split('T')[0];
+    const lastDay = new Date(year, month, 0).getDate();
+    const endDateStr = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
     const tasks = await this.taskRepository
       .createQueryBuilder('task')
